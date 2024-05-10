@@ -201,3 +201,18 @@ func (bl BoolExpression) String() string {
 }
 
 func (bl BoolExpression) expression() {}
+
+type StringExpression struct {
+	tok lexer.Token
+	Val string
+}
+
+func (str StringExpression) Token() lexer.Token {
+	return str.tok
+}
+
+func (str StringExpression) expression() {}
+
+func (str StringExpression) String() string {
+	return fmt.Sprintf(`"%s"`, str.Val)
+}

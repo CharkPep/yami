@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -26,24 +27,18 @@ func TestSingeToken(t *testing.T) {
 				Literal: ";",
 			},
 		},
-		{
-			i: `"`,
-			out: Token{
-				Token:   DQUOTE,
-				Literal: `"`,
-			},
-		},
 	}
 
 	for _, test := range ts {
 		lexer := New(bytes.NewBufferString(test.i))
-		token, err := lexer.Advance()
+		tok := Token{}
+		err := lexer.Read(&tok)
 		if err != nil {
 			t.Error(err)
 		}
 
-		if token.Token != test.out.Token || token.Literal != test.out.Literal {
-			t.Errorf("expected %v, got %v", test.out, token)
+		if tok.Token != test.out.Token || tok.Literal != test.out.Literal {
+			t.Errorf("expected %v, got %v", test.out, tok)
 		}
 	}
 
@@ -57,7 +52,7 @@ func TestMultipleTokens(t *testing.T) {
 
 	ts := []tt{
 		{
-			i: "arr= [];\n 5/2 true, false",
+			i: `arr= []; 5/2 true, false "hello world!"`,
 			out: []Token{
 				{
 					Token:   IDENT,
@@ -103,6 +98,10 @@ func TestMultipleTokens(t *testing.T) {
 					Token:   FALSE,
 					Literal: "false",
 				},
+				{
+					Token:   STRING,
+					Literal: "hello world!",
+				},
 			},
 		},
 		{
@@ -143,7 +142,7 @@ let
 					Literal: "501",
 				},
 				{
-					Token:   DVERTLINE,
+					Token:   OR,
 					Literal: "||",
 				},
 				{
@@ -159,7 +158,7 @@ let
 					Literal: "1",
 				},
 				{
-					Token:   DAMPERSAND,
+					Token:   AND,
 					Literal: "&&",
 				},
 
@@ -221,84 +220,21 @@ let
 	for _, test := range ts {
 		lexer := New(bytes.NewBufferString(test.i))
 		for i, expected := range test.out {
-			token, err := lexer.Advance()
+			tok := Token{}
+			err := lexer.Read(&tok)
 			if err != nil {
 				t.Error(err)
 			}
 
-			if expected.Token != token.Token {
-				t.Errorf("expected %s, got %s, token %d", expected.Token, token.Token, i)
-			}
-
-			if expected.Token != lexer.CurToken().Token {
-				t.Errorf("expected %s, got %s, token %d", expected.Token, lexer.CurToken().Token, i)
+			if expected.Token != tok.Token || expected.Literal != tok.Literal {
+				t.Errorf("expected %q, got %q, token %d", expected, tok, i)
 			}
 
 		}
 	}
 }
 
-func TestBufferedLexer_PeekToken(t *testing.T) {
-	type tt struct {
-		i    string
-		cur  Token
-		peek Token
-	}
-
-	tc := []tt{
-		{
-			i: "let a = 10",
-			cur: Token{
-				Token:   LET,
-				Literal: "let",
-			},
-			peek: Token{
-				Token:   IDENT,
-				Line:    0,
-				Column:  0,
-				Literal: "a",
-			},
-		},
-		{
-			i: `
-//comment
-//comment
-//comment
-//comment
-a b
-`,
-			cur: Token{
-				Token:   IDENT,
-				Literal: "a",
-			},
-			peek: Token{
-				Token:   IDENT,
-				Line:    0,
-				Column:  0,
-				Literal: "b",
-			},
-		},
-	}
-
-	for _, test := range tc {
-		lexer := New(bytes.NewBufferString(test.i))
-		if _, err := lexer.Advance(); err != nil {
-			t.Error(err)
-		}
-
-		if token := lexer.CurToken(); token.Token != test.cur.Token || token.Literal != test.cur.Literal {
-			t.Errorf("expected %+v, got %+v", test.cur, token)
-		}
-
-		if token := lexer.PeekToken(); token.Token != test.peek.Token || token.Literal != test.peek.Literal {
-			t.Errorf("expected %+v, got %+v", test.peek, token)
-		}
-
-	}
-
-}
-
-func TestBufferedLexer_LineAndColumnCount(t *testing.T) {
+func TestLexerLineAndColumnCount(t *testing.T) {
 	type tt struct {
 		i string
 		o []Token
@@ -380,24 +316,33 @@ let abc_aaa ==  != 10;`,
 					Column:  22,
 					Literal: ";",
 				},
+				{
+					Token:   EOF,
+					Line:    1,
+					Column:  22,
+					Literal: "",
+				},
 			},
 		},
 	}
 
-	for _, test := range ts {
-		lexer := New(bytes.NewBufferString(test.i))
-		for i, expected := range test.o {
-			tok, err := lexer.Advance()
-			if err != nil {
-				t.Error(err)
+	for i, test := range ts {
+		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
+			lexer := New(bytes.NewBufferString(test.i))
+			for i, expected := range test.o {
+				tok := Token{}
+				err := lexer.Read(&tok)
+				if err != nil {
+					t.Error(err)
+				}
+
+				if tok != expected {
+					t.Errorf("token %d: expected %v, got %v", i, expected, tok)
+				}
+
 			}
 
-			if tok != expected {
-				t.Errorf("token %d: expected %v, got %v", i, expected, tok)
-			}
-
-		}
+		})
 
 	}
-
 }

@@ -2,230 +2,228 @@ package lexer
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 )
 
-// TODO: rewrite lexer to be more like bufio.Reader with Peek and Read (Advance) methods only
-
-type ILexer interface {
-	Advance() (Token, error)
-	CurToken() Token
-	PeekToken() Token
+type TokenReader interface {
+	Read(token *Token) error
 }
 
-type BufferedLexer struct {
+type Lexer struct {
 	r      *bufio.Reader
-	peek   *Token
-	cur    *Token
-	ch     byte
 	column int
 	line   int
 }
 
-func New(r io.Reader) *BufferedLexer {
-	l := &BufferedLexer{
+func New(r io.Reader) *Lexer {
+	l := &Lexer{
 		r: bufio.NewReader(r),
 	}
 
 	return l
 }
 
-func (l *BufferedLexer) advanceToken() error {
-	l.cur = l.peek
-	token, err := l.nextToken()
-	l.peek = &token
-	return err
-}
-
-func (l *BufferedLexer) CurToken() Token {
-	if l.cur == nil {
-		return NewToken(NIL, l.line, l.column, "")
-	}
-
-	return *l.cur
-}
-
-func (l *BufferedLexer) PeekToken() Token {
-	if l.peek == nil {
-		return NewToken(EOF, l.line, l.column, "")
-	}
-
-	return *l.peek
-}
-
-func (l *BufferedLexer) Advance() (Token, error) {
-	if err := l.advanceToken(); err != nil {
-		return NewToken(ILLEGAL, l.line, l.column, ""), err
-	}
-
-	for l.cur == nil {
-		if err := l.advanceToken(); err != nil {
-			return NewToken(ILLEGAL, l.line, l.column, ""), err
-		}
-	}
-
-	return *l.cur, nil
-}
-
-func (l *BufferedLexer) nextToken() (Token, error) {
+func (l *Lexer) Read(t *Token) error {
 	l.skipWhitespace()
-	peek, err := l.r.ReadByte()
+	cur, err := l.r.ReadByte()
 	if err == io.EOF {
-		return NewToken(EOF, l.line, l.column, "EOF"), nil
+		l.assignToken(t, EOF, l.line, l.column, "")
+		return nil
 	}
 
-	l.ch = peek
-	l.column += 1
 	if err != nil {
-		return NewToken(ILLEGAL, l.line, l.column, ""), err
+		return err
 	}
 
-	switch peek {
+	l.column += 1
+	switch cur {
 	case '*':
-		return NewToken(ASTERISK, l.line, l.column, "*"), nil
+		l.assignToken(t, ASTERISK, l.line, l.column, "*")
+		return nil
 	case '=':
-		ok, err := l.peekAndAssert(byte('='))
-		if err != nil || !ok {
-			return NewToken(ASSIGN, l.line, l.column, "="), nil
+		ok := l.peekAndAssert(byte('='))
+		if !ok {
+			l.assignToken(t, ASSIGN, l.line, l.column, "=")
+			return nil
 		}
 
-		return NewToken(EQ, l.line, l.column, "=="), nil
+		l.r.ReadByte()
+		l.column++
+		l.assignToken(t, EQ, l.line, l.column, "==")
+		return nil
 	case ';':
-		return NewToken(SCOLUMN, l.line, l.column, ";"), nil
+		l.assignToken(t, SCOLUMN, l.line, l.column, ";")
+		return nil
 	case '+':
-		return NewToken(PLUS, l.line, l.column, "+"), nil
+		l.assignToken(t, PLUS, l.line, l.column, "+")
+		return nil
 	case '>':
-		ok, err := l.peekAndAssert(byte('='))
-		if err != nil || !ok {
-			return NewToken(GT, l.line, l.column, ">"), nil
+		ok := l.peekAndAssert(byte('='))
+		if !ok {
+			l.assignToken(t, GT, l.line, l.column, ">")
+			return nil
 		}
 
-		return NewToken(GTE, l.line, l.column, ">="), nil
+		l.r.ReadByte()
+		l.column++
+		l.assignToken(t, GTE, l.line, l.column, ">=")
+		return nil
 	case '<':
-		ok, err := l.peekAndAssert(byte('='))
-		if err != nil || !ok {
-			return NewToken(LT, l.line, l.column, "<"), nil
+		ok := l.peekAndAssert(byte('='))
+		if !ok {
+			l.assignToken(t, LT, l.line, l.column, "<")
+			return nil
 		}
 
-		return NewToken(LTE, l.line, l.column, "<="), nil
+		l.r.ReadByte()
+		l.column++
+		l.assignToken(t, LTE, l.line, l.column, "<=")
+		return nil
 	case '-':
-		return NewToken(HYPHEN, l.line, l.column, "-"), nil
+		l.assignToken(t, HYPHEN, l.line, l.column, "-")
+		return nil
 	case '!':
-		ok, err := l.peekAndAssert(byte('='))
-		if err != nil || !ok {
-			return NewToken(BANG, l.line, l.column, "!"), nil
+		ok := l.peekAndAssert(byte('='))
+		if !ok {
+			l.assignToken(t, BANG, l.line, l.column, "!")
+			return nil
 		}
 
-		return NewToken(NEQ, l.line, l.column, "!="), nil
+		l.r.ReadByte()
+		l.column++
+		l.assignToken(t, NEQ, l.line, l.column, "!=")
+		return nil
 	case '&':
-		ok, err := l.peekAndAssert(byte('&'))
-		if err != nil || !ok {
-			return NewToken(ILLEGAL, l.line, l.column, "&"), nil
+		ok := l.peekAndAssert(byte('&'))
+		if !ok {
+			l.assignToken(t, BAND, l.line, l.column, "&")
+			return nil
 		}
 
-		return NewToken(DAMPERSAND, l.line, l.column, "&&"), nil
+		l.r.ReadByte()
+		l.column++
+		l.assignToken(t, AND, l.line, l.column, "&&")
+		return nil
 	case '|':
-		ok, err := l.peekAndAssert(byte('|'))
-		if err != nil || !ok {
-			return NewToken(ILLEGAL, l.line, l.column, "|"), nil
+		ok := l.peekAndAssert(byte('|'))
+		if !ok {
+			l.assignToken(t, BOR, l.line, l.column, "|")
+			return nil
 		}
-
-		return NewToken(DVERTLINE, l.line, l.column, "||"), nil
+		l.r.ReadByte()
+		l.column++
+		l.assignToken(t, OR, l.line, l.column, "||")
+		return nil
 	case '/':
-		ok, err := l.peekAndAssert(byte('/'))
-		if err != nil || !ok {
-			return NewToken(SLASH, l.line, l.column, "/"), nil
+		ok := l.peekAndAssert(byte('/'))
+		if !ok {
+			l.assignToken(t, SLASH, l.line, l.column, "/")
+			return nil
 		}
 
-		if _, _, err := l.r.ReadLine(); err != nil {
-			return NewToken(ILLEGAL, l.line, l.column, ""), err
+		if _, _, err = l.r.ReadLine(); err != nil && err != io.EOF {
+			return err
 		}
 
 		l.line++
 		l.column = 0
-
-		return l.nextToken()
+		return l.Read(t)
 	case '"':
-		return NewToken(DQUOTE, l.line, l.column, `"`), nil
+		str, err := l.r.ReadSlice('"')
+		if err == io.EOF {
+			return fmt.Errorf("given string is invalid")
+		}
+
+		if err != nil {
+			return err
+		}
+
+		l.column += len(str)
+		l.assignToken(t, STRING, l.line, l.column, string(str[:len(str)-1]))
+		return nil
 	case '{':
-		return NewToken(BRLEFT, l.line, l.column, `{`), nil
+		l.assignToken(t, BRLEFT, l.line, l.column, `{`)
+		return nil
 	case '}':
-		return NewToken(BRRIGHT, l.line, l.column, `}`), nil
+		l.assignToken(t, BRRIGHT, l.line, l.column, `}`)
+		return nil
 	case '(':
-		return NewToken(BLEFT, l.line, l.column, `(`), nil
+		l.assignToken(t, BLEFT, l.line, l.column, `(`)
+		return nil
 	case ')':
-		return NewToken(BRIGHT, l.line, l.column, `)`), nil
+		l.assignToken(t, BRIGHT, l.line, l.column, `)`)
+		return nil
 	case '[':
-		return NewToken(SBLEFT, l.line, l.column, "["), nil
+		l.assignToken(t, SBLEFT, l.line, l.column, "[")
+		return nil
 	case ']':
-		return NewToken(SBRIGHT, l.line, l.column, "]"), nil
+		l.assignToken(t, SBRIGHT, l.line, l.column, "]")
+		return nil
 	case ',':
-		return NewToken(COMA, l.line, l.column, ","), nil
+		l.assignToken(t, COMA, l.line, l.column, ",")
+		return nil
 	default:
 		var literal []byte
-		if IsDigit(peek) {
-			literal, err = l.readNumber()
+		if IsDigit(cur) {
+			literal = l.readNumber()
 			l.column += len(literal)
-			return NewToken(NUMBER, l.line, l.column, string(peek)+string(literal)), nil
+			l.assignToken(t, NUMBER, l.line, l.column, string(cur)+string(literal))
+			return nil
 		}
 
-		literal, err = l.readIndent()
-		if err != nil && err != io.EOF {
-			return NewToken(ILLEGAL, l.line, l.column, ""), err
-		}
-
+		literal = l.readIndent()
 		l.column += len(literal)
-		tokenLiteral := string(peek) + string(literal)
+		tokenLiteral := string(cur) + string(literal)
 		tokenType := LookupKeywordOrIdent(tokenLiteral)
-		return NewToken(tokenType, l.line, l.column, tokenLiteral), nil
+		l.assignToken(t, tokenType, l.line, l.column, tokenLiteral)
+		return nil
 	}
 
 }
 
-func (l *BufferedLexer) peekAndAssert(assert byte) (bool, error) {
+func (l *Lexer) assignToken(t *Token, tType TokenType, line, column int, literal string) {
+	t.Token = tType
+	t.Line = line
+	t.Column = column
+	t.Literal = literal
+}
+
+func (l *Lexer) peekAndAssert(assert byte) bool {
 	peek, err := l.r.Peek(1)
 	if err != nil {
-		return false, err
+		return false
 	}
 
 	if peek[0] == assert {
-		l.r.ReadByte()
-		l.column++
-		return true, err
+		return true
 	}
 
-	return false, err
+	return false
 }
 
-func (l *BufferedLexer) readIndent() (buf []byte, err error) {
-	var (
-		peek []byte
-	)
-
-	for peek, err = l.r.Peek(1); err == nil && IsAllowedInIdent(peek[0]); peek, err = l.r.Peek(1) {
+func (l *Lexer) readIndent() []byte {
+	var buf []byte
+	for peek, err := l.r.Peek(1); err == nil && IsIdentCh(peek[0]); peek, err = l.r.Peek(1) {
 		buf = append(buf, peek[0])
 		l.r.ReadByte()
 	}
 
-	return
+	return buf
 }
 
-func (l *BufferedLexer) readNumber() (buf []byte, err error) {
+func (l *Lexer) readNumber() []byte {
+	var buf []byte
 	for digit, err := l.r.Peek(1); err == nil && IsDigit(digit[0]); digit, err = l.r.Peek(1) {
 		buf = append(buf, digit[0])
 		l.r.ReadByte()
 	}
 
-	return
+	return buf
 }
 
-func (l *BufferedLexer) skipWhitespace() error {
-	var (
-		peek []byte
-		err  error
-	)
-
-	for peek, err = l.r.Peek(1); err == nil && IsWhitespace(peek[0]); peek, err = l.r.Peek(1) {
+func (l *Lexer) skipWhitespace() {
+	for peek, err := l.r.Peek(1); err == nil && IsWhitespace(peek[0]); peek, err = l.r.Peek(1) {
 		l.column++
 		if ch, _ := l.r.ReadByte(); ch == '\n' {
 			l.line++
@@ -233,11 +231,7 @@ func (l *BufferedLexer) skipWhitespace() error {
 		}
 	}
 
-	return err
-}
-
-func IsLetter(ch byte) bool {
-	return ch >= 'A' && ch <= 'Z' || ch >= 'a' && ch <= 'z'
+	return
 }
 
 func IsDigit(ch byte) bool {
@@ -252,7 +246,7 @@ func IsWhitespace(ch byte) bool {
 	return false
 }
 
-func IsAllowedInIdent(ch byte) bool {
+func IsIdentCh(ch byte) bool {
 	if (ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z') || ch == '_' {
 		return true
 	}

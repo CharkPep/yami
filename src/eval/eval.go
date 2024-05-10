@@ -135,6 +135,10 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 		return eval, err
 	case parser.CallExpression:
 		return e.evalCallExpression(v, env)
+	case parser.StringExpression:
+		return object.StringObject{
+			Val: v.Val,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported node %T\n", v)
 	}
@@ -228,6 +232,11 @@ func (e Evaluator) evalInfix(infix *parser.InfixExpression, env *object.Environm
 	case right.Type() == object.INTEGER_OBJ && left.Type() == object.BOOL_OBJ:
 		leftInt := e.boolObjToInt(left.(object.BoolObject))
 		return e.evalInfixInteger(infix, leftInt, right.(object.IntegerObject))
+	case right.Type() == object.STRING_OBJ && left.Type() == object.STRING_OBJ:
+		return object.StringObject{
+			Val: left.(object.StringObject).Val + right.(object.StringObject).Val,
+		}, nil
+
 	}
 
 	return nil, fmt.Errorf("not supported types")

@@ -151,6 +151,11 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 				return false
 			}
 		}
+	case BoolExpression:
+		if v.Val != b.(BoolExpression).Val {
+			t.Errorf("Failed to assert bools: %v, %v\n", v.Val, b.(BoolExpression).Val)
+			return false
+		}
 	default:
 		t.Errorf("Not supported type %T\n", v)
 		return false
@@ -313,7 +318,7 @@ func TestArithmeticAndLogicOperations(t *testing.T) {
 							},
 						},
 						Operator: lexer.Token{
-							Token:   lexer.DVERTLINE,
+							Token:   lexer.OR,
 							Literal: "||",
 						},
 						Right: IntegerExpression{
@@ -321,7 +326,7 @@ func TestArithmeticAndLogicOperations(t *testing.T) {
 						},
 					},
 					Operator: lexer.Token{
-						Token:   lexer.DVERTLINE,
+						Token:   lexer.OR,
 						Literal: "||",
 					},
 					Right: IntegerExpression{
@@ -329,7 +334,7 @@ func TestArithmeticAndLogicOperations(t *testing.T) {
 					},
 				},
 				Operator: lexer.Token{
-					Token:   lexer.DAMPERSAND,
+					Token:   lexer.AND,
 					Literal: "&&",
 				},
 				Right: &InfixExpression{
@@ -877,15 +882,66 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 				},
 			},
 		},
+		{
+			"(true || false) == (true || true)",
+			&RootNode{
+				Statements: []Statement{
+					ExpressionStatement{
+						Expr: &InfixExpression{
+							Left: &InfixExpression{
+								Left: BoolExpression{
+									token: lexer.Token{
+										Token:   lexer.TRUE,
+										Literal: "true",
+									},
+									Val: true,
+								},
+								Operator: lexer.Token{
+									Token:   lexer.OR,
+									Literal: "||",
+								},
+								Right: BoolExpression{
+									token: lexer.Token{
+										Token:   lexer.FALSE,
+										Literal: "false",
+									},
+									Val: false,
+								},
+							},
+							Operator: lexer.Token{
+								Token:   lexer.EQ,
+								Literal: "==",
+							},
+							Right: &InfixExpression{
+								Left: BoolExpression{
+									token: lexer.Token{
+										Token:   lexer.TRUE,
+										Literal: "true",
+									},
+									Val: true,
+								},
+								Operator: lexer.Token{
+									Token:   lexer.OR,
+									Literal: "||",
+								},
+								Right: BoolExpression{
+									token: lexer.Token{
+										Token:   lexer.TRUE,
+										Literal: "true",
+									},
+									Val: true,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for i, test := range ts {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			lex := lexer.New(bytes.NewBuffer([]byte(test.i)))
-			if _, err := lex.Advance(); err != nil {
-				t.Error(err)
-			}
-			p := NewParserFromLexer(lex)
+			p := NewParser(bytes.NewBuffer([]byte(test.i)))
 			root, err := p.Parse()
 			if err != nil {
 				t.Error(err)

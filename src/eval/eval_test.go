@@ -69,6 +69,11 @@ func AssertObjects(t *testing.T, a, b object.Object) bool {
 		}
 	case object.NilObject:
 		return true
+	case object.StringObject:
+		if v.Val != b.(object.StringObject).Val {
+			t.Errorf("failed to assert string values")
+			return false
+		}
 	default:
 		t.Errorf("Not implemented for object %T\n", a)
 		return false
@@ -97,6 +102,7 @@ func TestEvalArithmetic(t *testing.T) {
 		{"1 - true", "0"},
 		{"1 + false", "1"},
 		{"10 + false", "10"},
+		{`"hello " + "world"`, "hello world"},
 		// TODO add bitwise operators
 		//{"4 & 12", "4"},
 		//{"4 & 12", "12"},
@@ -106,7 +112,7 @@ func TestEvalArithmetic(t *testing.T) {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
 			obj := EvaluteProgram(t, bytes.NewBufferString(test.i))
 			if obj.Inspect() != test.e {
-				t.Errorf("expected %s, got %s\n", test.e, obj.Inspect())
+				t.Errorf("expected %q, got %q\n", test.e, obj.Inspect())
 			}
 		})
 	}
@@ -292,11 +298,16 @@ func TestEval(t *testing.T) {
 			`if 1==0 {return 0}`,
 			object.NilObject{},
 		},
+		{
+			`"hello"`,
+			object.StringObject{
+				Val: "hello",
+			},
+		},
 	}
 
 	for i, test := range ts {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			//t.Parallel()
 			obj := EvaluteProgram(t, bytes.NewBufferString(test.i))
 			AssertObjects(t, obj, test.o)
 		})

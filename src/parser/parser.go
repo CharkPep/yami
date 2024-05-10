@@ -75,13 +75,14 @@ func NewParser(r io.Reader) *Parser {
 }
 
 type Parser struct {
-	lex lexer.ILexer
-	//exprParser *ExpressionParser
+	lex lexer.TokenReader
 
 	prefixParseFn map[lexer.TokenType]prefixParseFn
 	infixParseFn  map[lexer.TokenType]infixParseFn
 
-	Errors []ParsingError
+	curToken  lexer.Token
+	peekToken lexer.Token
+	Errors    []ParsingError
 }
 
 func (p *Parser) registerPrefixFunc(token lexer.TokenType, fn prefixParseFn) {
@@ -98,12 +99,7 @@ func (p *Parser) registerInfixesFunc(fn infixParseFn, tokens ...lexer.TokenType)
 	}
 }
 
-func (p *Parser) SetLexer(lex lexer.ILexer) *Parser {
-	p.lex = lex
-	return p
-}
-
-func NewParserFromLexer(lex lexer.ILexer) *Parser {
+func NewParserFromLexer(lex lexer.TokenReader) *Parser {
 	p := &Parser{
 		lex:           lex,
 		prefixParseFn: make(map[lexer.TokenType]prefixParseFn),
@@ -121,85 +117,98 @@ func NewParserFromLexer(lex lexer.ILexer) *Parser {
 	p.registerInfixFunc(lexer.ASSIGN, p.parseAssignExpression)
 	p.registerPrefixFunc(lexer.TRUE, p.parseBoolExpression)
 	p.registerPrefixFunc(lexer.FALSE, p.parseBoolExpression)
+	p.registerPrefixFunc(lexer.STRING, p.parseString)
 
 	p.registerInfixesFunc(p.ParseInfix, lexer.PLUS, lexer.HYPHEN, lexer.SLASH, lexer.ASTERISK, lexer.EQ, lexer.NEQ,
-		lexer.DVERTLINE, lexer.DAMPERSAND, lexer.GT, lexer.GTE, lexer.LT, lexer.LTE)
+		lexer.OR, lexer.AND, lexer.GT, lexer.GTE, lexer.LT, lexer.LTE)
 
 	return p
 }
 
-func (p *Parser) Parse() (Node, error) {
-	root := RootNode{}
-	p.Errors = nil
-	var err error
-	if p.lex.CurToken().Token == lexer.NIL {
-		p.lex.Advance()
+func (p *Parser) read() error {
+	p.curToken = p.peekToken
+	if err := p.lex.Read(&p.peekToken); err != nil {
+		return err
 	}
 
-	for token := p.lex.CurToken(); token.Token != lexer.EOF && token.Token != lexer.ILLEGAL; token, err = p.lex.Advance() {
+	return nil
+}
+
+func (p *Parser) Parse() (Node, error) {
+	root := RootNode{}
+	p.read()
+	var err error
+	for err = p.read(); err == nil && p.curToken.Token != lexer.ILLEGAL && p.curToken.Token != lexer.EOF; err = p.read() {
+		st, err := p.parseStatement()
 		if err != nil {
 			return nil, err
 		}
-		st := p.parseStatement()
-		// parsing error occurred
-		if st == nil || token.Token == lexer.NIL {
-			p.lex.Advance()
+
+		if st == nil {
 			continue
 		}
+
 		root.Statements = append(root.Statements, st)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	return &root, nil
 }
 
-func (p *Parser) parseStatement() Statement {
+func (p *Parser) parseStatement() (Statement, error) {
 	var (
 		st  Statement
 		err error
 	)
-	switch p.lex.CurToken().Token {
+	switch p.curToken.Token {
 	case lexer.LET:
 		st, err = p.parseLet()
 	case lexer.RETURN:
 		st, err = p.parseReturnStatement()
-	// closure in Statements
 	case lexer.BRLEFT:
-		st = p.parseBlockStatement()
+		st, err = p.parseBlockStatement()
+	case lexer.SCOLUMN:
+		break
 	default:
 		st, err = p.parserExpressionStatement()
 	}
 
 	if err != nil {
 		if !errors.As(err, &ParsingError{}) {
-			panic(err)
+			return nil, err
 		}
 
 		p.Errors = append(p.Errors, err.(ParsingError))
 	}
 
-	for p.lex.PeekToken().Token == lexer.SCOLUMN {
-		p.lex.Advance()
+	if p.peekToken.Token == lexer.SCOLUMN {
+		if err = p.read(); err != nil {
+			return nil, err
+		}
 	}
 
-	return st
+	return st, nil
 }
 
 func (p *Parser) isCurToken(token lexer.TokenType) bool {
-	return p.lex.CurToken().Token == token
+	return p.curToken.Token == token
 }
 
 func (p *Parser) parserExpressionStatement() (Statement, error) {
 	var err error
-	st := ExpressionStatement{Tok: p.lex.CurToken()}
+	st := ExpressionStatement{Tok: p.curToken}
 
 	st.Expr, err = p.parseExpression(LOWEST)
 	return st, err
 }
 
 func (p *Parser) parseExpression(precedence int) (Expression, error) {
-	prefix, ok := p.prefixParseFn[p.lex.CurToken().Token]
+	prefix, ok := p.prefixParseFn[p.curToken.Token]
 	if !ok {
-		return nil, NewParsingError("missing Prefix parser", p.lex.CurToken())
+		return nil, NewParsingError("missing Prefix parser", p.curToken)
 	}
 
 	left, err := prefix()
@@ -207,11 +216,11 @@ func (p *Parser) parseExpression(precedence int) (Expression, error) {
 		return nil, err
 	}
 
-	for !p.isCurToken(lexer.SCOLUMN) && precedence < p.precedence(p.lex.PeekToken().Token) {
-		p.lex.Advance()
-		infix, ok := p.infixParseFn[p.lex.CurToken().Token]
+	for !p.isCurToken(lexer.SCOLUMN) && precedence < p.precedence(p.peekToken.Token) {
+		p.read()
+		infix, ok := p.infixParseFn[p.curToken.Token]
 		if !ok {
-			return nil, NewParsingError("missing infix parser", p.lex.CurToken())
+			return nil, NewParsingError("missing infix parser", p.curToken)
 		}
 
 		left, err = infix(left)
@@ -227,9 +236,9 @@ func (p *Parser) precedence(token lexer.TokenType) int {
 	switch token {
 	case lexer.ASSIGN:
 		return ASSIGN
-	case lexer.DVERTLINE:
+	case lexer.OR:
 		return OR
-	case lexer.DAMPERSAND:
+	case lexer.AND:
 		return AND
 	case lexer.LT, lexer.LTE, lexer.GTE, lexer.GT, lexer.EQ, lexer.NEQ:
 		return RELATIONAL

@@ -108,6 +108,10 @@ func TestParseLetStatements(t *testing.T) {
 				t.Error(err)
 			}
 
+			if len(p.Errors) != 0 {
+				t.Error(p.Errors)
+			}
+
 			if !test.o.Match([]byte(root.String())) {
 				t.Errorf("expected %s, got %q", test.o, root.String())
 			}
@@ -118,7 +122,7 @@ func TestParseLetStatements(t *testing.T) {
 
 func TestParseInfix(t *testing.T) {
 	type tt struct {
-		i lexer.ILexer
+		i lexer.TokenReader
 		o string
 	}
 
@@ -126,18 +130,12 @@ func TestParseInfix(t *testing.T) {
 		{
 			i: utils.NewMockLexer([]lexer.Token{{
 				Token:   lexer.NUMBER,
-				Line:    0,
-				Column:  0,
 				Literal: "5",
 			}, {
 				Token:   lexer.PLUS,
-				Line:    0,
-				Column:  0,
 				Literal: "+",
 			}, {
 				Token:   lexer.NUMBER,
-				Line:    0,
-				Column:  0,
 				Literal: "5",
 			}}),
 			o: "(5 + 5)\n",
@@ -199,6 +197,10 @@ func TestParseInfix(t *testing.T) {
 			t.Error(err)
 		}
 
+		if len(p.Errors) != 0 {
+			t.Error(p.Errors)
+		}
+
 		if root.String() != test.o {
 			t.Errorf("expected %q, got %q", test.o, root.String())
 		}
@@ -209,7 +211,7 @@ func TestParseInfix(t *testing.T) {
 
 func TestParseExpression(t *testing.T) {
 	type tt struct {
-		i lexer.ILexer
+		i lexer.TokenReader
 		o string
 	}
 
@@ -337,6 +339,23 @@ func TestParseExpression(t *testing.T) {
 			}),
 			o: "true\nfalse\n",
 		},
+		{
+			i: utils.NewMockLexer([]lexer.Token{
+				{
+					Token:   lexer.TRUE,
+					Literal: "true",
+				},
+				{
+					Token:   lexer.AND,
+					Literal: "&&",
+				},
+				{
+					Token:   lexer.FALSE,
+					Literal: "false",
+				},
+			}),
+			o: "(true && false)\n",
+		},
 	}
 
 	for i, test := range tcs {
@@ -355,6 +374,7 @@ func TestParseExpression(t *testing.T) {
 			if node.String() != test.o {
 				t.Errorf("expected %q, got %q", test.o, node.String())
 			}
+			t.Logf(node.String())
 		})
 	}
 }
@@ -388,7 +408,12 @@ func TestParseBlockExpression(t *testing.T) {
 	})
 
 	p := NewParserFromLexer(test)
-	st := p.parseStatement()
+	p.read()
+	p.read()
+	st, err := p.parseStatement()
+	if err != nil {
+		t.Error(err)
+	}
 	if len(p.Errors) != 0 {
 		t.Errorf("unexpected error %v", p.Errors)
 	}
@@ -504,4 +529,33 @@ func TestParseIfExpression(t *testing.T) {
 
 }
 
-// TODO: add error handling tests
+func TestStringParsing(t *testing.T) {
+	i := `let a = "hello world"`
+	p := NewParser(bytes.NewBufferString(i))
+
+	rootNode, err := p.Parse()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(p.Errors) != 0 {
+		t.Error(p.Errors)
+	}
+
+	expected := "hello world"
+	root := AssertRoot(t, rootNode)
+	if len(root.Statements) != 1 {
+		t.Errorf("expected 1 statement, got %d\n", len(root.Statements))
+	}
+
+	let := AssertLetStatement(t, root.Statements[0])
+	str, ok := let.Expression.(StringExpression)
+	if !ok {
+		t.Errorf("expected string, got %T\n", let.Expression)
+	}
+
+	if str.Val != expected {
+		t.Errorf("expected string: %s, got: %s\n", expected, str.Val)
+	}
+
+}

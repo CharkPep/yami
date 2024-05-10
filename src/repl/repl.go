@@ -5,15 +5,15 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/charkpep/yad/src/eval"
-	"github.com/charkpep/yad/src/lexer"
+	"github.com/charkpep/yad/src/object"
 	"github.com/charkpep/yad/src/parser"
 	"io"
 )
 
 type Repl struct {
-	lexer     lexer.ILexer
 	lexerIn   io.Writer
 	parser    *parser.Parser
+	env       *object.Environment
 	evaluator *eval.Evaluator
 	in        io.Reader
 	out       io.Writer
@@ -21,13 +21,13 @@ type Repl struct {
 
 func New(in io.Reader, out io.Writer) *Repl {
 	lexerIn := bytes.NewBuffer(make([]byte, 0))
-	lex := lexer.New(lexerIn)
-	p := parser.NewParserFromLexer(lex)
+	p := parser.NewParser(lexerIn)
+	env := object.NewEnv()
 	e := eval.NewEvaluator()
 	return &Repl{
-		lexer:     lex,
 		lexerIn:   lexerIn,
 		evaluator: e,
+		env:       env,
 		parser:    p,
 		in:        in,
 		out:       out,
@@ -43,10 +43,6 @@ func (r Repl) Start() {
 		}
 
 		r.lexerIn.Write(s.Bytes())
-		for r.lexer.CurToken().Token == lexer.EOF && len(s.Bytes()) != 0 {
-			r.lexer.Advance()
-		}
-
 		root, err := r.parser.Parse()
 		if err != nil {
 			fmt.Println(err)
@@ -58,12 +54,17 @@ func (r Repl) Start() {
 			continue
 		}
 
-		obj, err := r.evaluator.Eval(root)
+		obj, err := r.evaluator.EvalWithEnv(root, r.env)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
-		fmt.Println(obj.Inspect())
+		if obj != nil {
+			fmt.Println(obj.Inspect())
+		} else {
+			fmt.Println("Nil")
+		}
+
 	}
 }

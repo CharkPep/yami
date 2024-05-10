@@ -12,6 +12,7 @@ var (
 	RETURN_OBJ  ObjectType = "RETURN"
 	INTEGER_OBJ ObjectType = "INTEGER"
 	BOOL_OBJ    ObjectType = "BOOL"
+	STRING_OBJ  ObjectType = "STRING"
 	NIL_OBJ     ObjectType = "NIL"
 )
 
@@ -90,4 +91,16 @@ func NewFuncObject(args []parser.IdentifierExpression, body parser.BlockStatemen
 		Args: args,
 		Body: body,
 	}
+}
+
+type StringObject struct {
+	Val string
+}
+
+func (str StringObject) Type() ObjectType {
+	return STRING_OBJ
+}
+
+func (str StringObject) Inspect() string {
+	return str.Val
 }

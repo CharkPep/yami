@@ -16,36 +16,38 @@ const (
 	FUNC   = "FUNC"
 	IDENT  = "INDENT"
 	NUMBER = "NUMBER"
+	STRING = "STRING"
 	IF     = "IF"
 	ELSE   = "ELSE"
 	TRUE   = "TRUE"
 	FALSE  = "FALSE"
 	RETURN = "RETURN"
 
-	PLUS   = "PLUS"
-	HYPHEN = "HYPHEN"
-	SLASH  = "SLASH"
-
-	// Special token
-
-	DQUOTE  = "DQUOTE"  // Double quote
+	PLUS    = "PLUS"
+	HYPHEN  = "HYPHEN"
+	SLASH   = "SLASH"
 	SCOLUMN = "SCOLUMN" // Semi column
-
-	ASSIGN = "ASSIGN"
+	ASSIGN  = "ASSIGN"
 
 	// Boolean
 
-	LT         = "LT"
-	GT         = "GT"
-	LTE        = "LTE"
-	GTE        = "GTE"
-	EQ         = "EQ"
-	NEQ        = "NEQ"
-	BANG       = "BANG"
-	DAMPERSAND = "DAMPERSAND" // [D]ouble ampersand
-	DVERTLINE  = "DVERTLINE"  // [D]ouble vertical line
+	LT   = "LT"
+	GT   = "GT"
+	LTE  = "LTE"
+	GTE  = "GTE"
+	EQ   = "EQ"
+	NEQ  = "NEQ"
+	BANG = "BANG"
+	AND  = "AND" // [D]ouble ampersand
+	OR   = "OR"  // [D]ouble vertical line
 
-	//TODO add binary
+	// Bitwise operation
+
+	BAND    = "BAND"
+	BOR     = "BOR"
+	BXOR    = "BXOR"
+	BLSHIFT = "BLSHIFT"
+	BRSHIFT = "BRSHIFT"
 
 	// Binary
 
@@ -59,18 +61,9 @@ const (
 
 	COMA    = "COMA"
 	ILLEGAL = "ILLEGAL"
-	NIL     = "NIL"
 	EOF     = "EOF"
+	NIL     = "NIL"
 )
-
-func NewToken(token TokenType, line, column int, literal string) Token {
-	return Token{
-		Token:   token,
-		Line:    line,
-		Column:  column,
-		Literal: literal,
-	}
-}
 
 var keywords = map[string]TokenType{
 	"fn":     FUNC,
@@ -80,6 +73,8 @@ var keywords = map[string]TokenType{
 	"true":   TRUE,
 	"false":  FALSE,
 	"return": RETURN,
+	"<<":     BLEFT,
+	">>":     BRIGHT,
 }
 
 func LookupKeywordOrIdent(ident string) TokenType {
