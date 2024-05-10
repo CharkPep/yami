@@ -14,7 +14,7 @@ func NewEnv() *Environment {
 func DeriveEnv(root *Environment) *Environment {
 	return &Environment{
 		rootEnv: root,
-		env:     root.env,
+		env:     make(map[string]Object),
 	}
 }
 

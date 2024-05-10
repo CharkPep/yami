@@ -8,13 +8,12 @@ import (
 
 var (
 	TRUE = object.BoolObject{
-		OType: object.BOOL_OBJ,
-		Val:   true,
+		Val: true,
 	}
 	FALSE = object.BoolObject{
-		OType: object.BOOL_OBJ,
-		Val:   false,
+		Val: false,
 	}
+	NIL = object.NilObject{}
 )
 
 type RuntimeError struct {
@@ -24,7 +23,7 @@ type RuntimeError struct {
 
 func (re RuntimeError) Error() string {
 	if re.node != nil {
-		return fmt.Sprintf("%s | %s", re.msg, re.node)
+		return fmt.Sprintf("%s | %s line %d, column %d", re.msg, re.node, re.node.Token().Line, re.node.Token().Column)
 	}
 
 	return fmt.Sprintf("%s | nil", re.msg)
@@ -37,77 +36,169 @@ func NewRuntimeError(msg string, obj parser.Node) RuntimeError {
 	}
 }
 
-type Evaluator struct {
-	env *object.Environment
-}
+type Evaluator struct{}
 
 func NewEvaluator() *Evaluator {
-	return &Evaluator{
-		env: object.NewEnv(),
-	}
+	return &Evaluator{}
 }
 
 func (e Evaluator) Eval(node parser.Node) (object.Object, error) {
+	env := object.NewEnv()
+	return e.eval(node, env)
+}
+
+func (e Evaluator) EvalWithEnv(node parser.Node, env *object.Environment) (object.Object, error) {
+	return e.eval(node, env)
+}
+
+func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Object, error) {
 	switch v := node.(type) {
 	case *parser.RootNode:
-		return e.evalStatements(v.Statements)
+		return e.evalStatements(v.Statements, env)
 	case parser.ExpressionStatement:
-		return e.Eval(v.Expr)
+		return e.eval(v.Expr, env)
 	case parser.LetStatement:
-		if _, ok := e.env.Get(v.Identifier.Token().Literal); ok {
+		if _, ok := env.Get(v.Identifier.Token().Literal); ok {
 			return nil, NewRuntimeError("identifier is already defined", v)
 		}
 
-		val, err := e.Eval(v.Expression)
+		val, err := e.eval(v.Expression, env)
 		if err != nil {
 			return nil, err
 		}
 
-		e.env.Set(v.Identifier.Token().Literal, val)
+		env.Set(v.Identifier.Token().Literal, val)
 		return val, nil
 	case parser.IntegerExpression:
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   v.Val,
+			Val: v.Val,
 		}, nil
 	case parser.AssignExpression:
-		if _, ok := e.env.Get(v.Identifier.Token().Literal); !ok {
+		if _, ok := env.Get(v.Identifier.Token().Literal); !ok {
 			return nil, NewRuntimeError("identifier is not defined", v)
 		}
 
-		val, err := e.Eval(v.Val)
+		val, err := e.eval(v.Val, env)
 		if err != nil {
 			return nil, err
 		}
 
-		e.env.Set(v.Identifier.Token().Literal, val)
+		env.Set(v.Identifier.Token().Literal, val)
 		return val, nil
+	case parser.IfExpression:
+		condition, err := e.eval(v.Condition, env)
+		if err != nil {
+			return nil, err
+		}
+
+		cond, err := e.evalObjToBool(condition)
+		if err != nil {
+			return nil, err
+		}
+
+		if cond.Val {
+			return e.evalBlockStatement(v.Consequence, env)
+		}
+
+		if v.Alternative != nil {
+			return e.evalBlockStatement(*v.Alternative, env)
+		}
+
+		return NIL, nil
+	case parser.FuncExpression:
+		return object.NewFuncObject(v.Args, v.Body), nil
+	case parser.BlockStatement:
+		derivedEvn := object.DeriveEnv(env)
+		return e.evalBlockStatement(v, derivedEvn)
+	case parser.ReturnStatement:
+		returnObj, err := e.eval(v.ReturnExpr, env)
+		if err != nil {
+			return nil, err
+		}
+
+		return object.ReturnObject{
+			Val: returnObj,
+		}, nil
 	case parser.IdentifierExpression:
-		val, ok := e.env.Get(v.Token().Literal)
+		val, ok := env.Get(v.Token().Literal)
 		if !ok {
 			return nil, NewRuntimeError("identifier is not defined", v)
 		}
 
 		return val, nil
 	case parser.PrefixExpression:
-		return e.evalPrefix(v)
+		return e.evalPrefix(v, env)
 	case parser.BoolExpression:
 		return e.nativeBoolToObj(v.Val), nil
 	case *parser.InfixExpression:
-		return e.evalInfix(v)
+		eval, err := e.evalInfix(v, env)
+		return eval, err
+	case parser.CallExpression:
+		return e.evalCallExpression(v, env)
 	default:
 		return nil, fmt.Errorf("unsupported node %T\n", v)
 	}
 }
 
-func (e Evaluator) evalStatements(stmts []parser.Statement) (object.Object, error) {
+func (e Evaluator) evalBlockStatement(stmt parser.BlockStatement, env *object.Environment) (object.Object, error) {
+	var res object.Object
+	for _, stmt := range stmt.Statements {
+		var err error
+		res, err = e.eval(stmt, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Type() == object.RETURN_OBJ {
+			return res, nil
+		}
+
+	}
+
+	return res, nil
+
+}
+
+func (e Evaluator) evalCallExpression(expr parser.CallExpression, env *object.Environment) (object.Object, error) {
+	callObj, err := e.eval(expr.Call, env)
+	if err != nil {
+		return nil, err
+	}
+
+	call, ok := callObj.(object.FuncObject)
+	if !ok {
+		return nil, NewRuntimeError("expected function expression", expr)
+	}
+
+	if len(call.Args) != len(expr.CallArgs) {
+		return nil, NewRuntimeError("mismatching number of arguments", expr)
+	}
+
+	derivedEvn := object.DeriveEnv(env)
+	for i, arg := range expr.CallArgs {
+		obj, err := e.eval(arg, env)
+		if err != nil {
+			return nil, err
+		}
+
+		derivedEvn.Set(call.Args[i].Identifier.Literal, obj)
+	}
+
+	return e.evalStatements(call.Body.Statements, derivedEvn)
+}
+
+func (e Evaluator) evalStatements(stmts []parser.Statement, env *object.Environment) (object.Object, error) {
 	var res object.Object
 
 	for _, stmt := range stmts {
 		var err error
-		res, err = e.Eval(stmt)
+		res, err = e.eval(stmt, env)
 		if err != nil {
 			return nil, err
+		}
+
+		if res.Type() == object.RETURN_OBJ {
+			return res.(object.ReturnObject).Val, nil
 		}
 
 	}
@@ -115,13 +206,13 @@ func (e Evaluator) evalStatements(stmts []parser.Statement) (object.Object, erro
 	return res, nil
 }
 
-func (e Evaluator) evalInfix(infix *parser.InfixExpression) (object.Object, error) {
-	left, err := e.Eval(infix.Left)
+func (e Evaluator) evalInfix(infix *parser.InfixExpression, env *object.Environment) (object.Object, error) {
+	left, err := e.eval(infix.Left, env)
 	if err != nil {
 		return nil, err
 	}
 
-	right, err := e.Eval(infix.Right)
+	right, err := e.eval(infix.Right, env)
 	if err != nil {
 		return nil, err
 	}
@@ -137,28 +228,24 @@ func (e Evaluator) evalInfix(infix *parser.InfixExpression) (object.Object, erro
 	case right.Type() == object.INTEGER_OBJ && left.Type() == object.BOOL_OBJ:
 		leftInt := e.boolObjToInt(left.(object.BoolObject))
 		return e.evalInfixInteger(infix, leftInt, right.(object.IntegerObject))
-
 	}
-	return nil, nil
+
+	return nil, fmt.Errorf("not supported types")
 }
 
 func (e Evaluator) evalInfixInteger(infix *parser.InfixExpression, left, right object.IntegerObject) (object.Object, error) {
-	fmt.Println("Operator", infix.Operator.Literal)
 	switch infix.Operator.Literal {
 	case "+":
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   left.Val + right.Val,
+			Val: left.Val + right.Val,
 		}, nil
 	case "-":
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   left.Val - right.Val,
+			Val: left.Val - right.Val,
 		}, nil
 	case "*":
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   left.Val * right.Val,
+			Val: left.Val * right.Val,
 		}, nil
 	case "/":
 		if right.Val == 0 {
@@ -166,8 +253,7 @@ func (e Evaluator) evalInfixInteger(infix *parser.InfixExpression, left, right o
 		}
 
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   left.Val / right.Val,
+			Val: left.Val / right.Val,
 		}, nil
 	case "==":
 		return e.nativeBoolToObj(left.Val == right.Val), nil
@@ -183,13 +269,11 @@ func (e Evaluator) evalInfixInteger(infix *parser.InfixExpression, left, right o
 		return e.nativeBoolToObj(left.Val <= right.Val), nil
 	case "&":
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   left.Val & right.Val,
+			Val: left.Val & right.Val,
 		}, nil
 	case "|":
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   left.Val | right.Val,
+			Val: left.Val | right.Val,
 		}, nil
 	default:
 		return nil, NewRuntimeError("operator is not supported for int types", infix)
@@ -211,8 +295,8 @@ func (e Evaluator) evalBoolInfix(infix *parser.InfixExpression, left, right obje
 	return nil, NewRuntimeError("unexpected operator", infix)
 }
 
-func (e Evaluator) evalPrefix(node parser.PrefixExpression) (object.Object, error) {
-	right, err := e.Eval(node.Expr)
+func (e Evaluator) evalPrefix(node parser.PrefixExpression, env *object.Environment) (object.Object, error) {
+	right, err := e.eval(node.Expr, env)
 	if err != nil {
 		return nil, err
 	}
@@ -263,14 +347,12 @@ func (e Evaluator) evalObjToBool(obj object.Object) (object.BoolObject, error) {
 func (e Evaluator) boolObjToInt(obj object.BoolObject) object.IntegerObject {
 	if obj.Val {
 		return object.IntegerObject{
-			OType: object.INTEGER_OBJ,
-			Val:   1,
+			Val: 1,
 		}
 	}
 
 	return object.IntegerObject{
-		OType: object.INTEGER_OBJ,
-		Val:   0,
+		Val: 0,
 	}
 }
 

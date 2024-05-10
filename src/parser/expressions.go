@@ -42,17 +42,17 @@ func (i IntegerExpression) String() string {
 }
 
 type IdentifierExpression struct {
-	identifier lexer.Token
+	Identifier lexer.Token
 }
 
 func (i IdentifierExpression) Token() lexer.Token {
-	return i.identifier
+	return i.Identifier
 }
 
 func (i IdentifierExpression) expression() {}
 
 func (i IdentifierExpression) String() string {
-	return i.identifier.Literal
+	return i.Identifier.Literal
 }
 
 type InfixExpression struct {
@@ -89,9 +89,9 @@ func (p PrefixExpression) String() string {
 // IfExpression TODO remove in flavor of ternary Operator, if should be a statement
 type IfExpression struct {
 	token       lexer.Token
-	condition   Expression
-	consequence BlockStatement
-	alternative *BlockStatement
+	Condition   Expression
+	Consequence BlockStatement
+	Alternative *BlockStatement
 }
 
 func (i IfExpression) Token() lexer.Token {
@@ -103,13 +103,13 @@ func (i IfExpression) expression() {}
 func (i IfExpression) String() string {
 	buff := bytes.NewBuffer(make([]byte, 0))
 	buff.WriteString("if ")
-	buff.WriteString(i.condition.String())
+	buff.WriteString(i.Condition.String())
 	buff.WriteString(" { ")
-	buff.WriteString(i.consequence.String())
+	buff.WriteString(i.Consequence.String())
 	buff.WriteString(" }")
-	if i.alternative != nil {
+	if i.Alternative != nil {
 		buff.WriteString(" else {")
-		buff.WriteString(i.alternative.String())
+		buff.WriteString(i.Alternative.String())
 		buff.WriteString("}")
 	}
 
@@ -119,8 +119,8 @@ func (i IfExpression) String() string {
 
 type FuncExpression struct {
 	token lexer.Token
-	args  []IdentifierExpression
-	body  BlockStatement
+	Args  []IdentifierExpression
+	Body  BlockStatement
 }
 
 func (f FuncExpression) Token() lexer.Token {
@@ -133,22 +133,22 @@ func (f FuncExpression) String() string {
 	buff := bytes.NewBuffer(make([]byte, 0))
 	buff.WriteString("fn ")
 	buff.WriteString("(")
-	for i, arg := range f.args {
+	for i, arg := range f.Args {
 		buff.WriteString(arg.String())
-		if i+1 != len(f.args) {
+		if i+1 != len(f.Args) {
 			buff.WriteString(",")
 		}
 	}
 
 	buff.WriteString(") ")
-	buff.WriteString(f.body.String())
+	buff.WriteString(f.Body.String())
 	return buff.String()
 }
 
 type CallExpression struct {
 	token    lexer.Token
-	f        Expression
-	callArgs []Expression
+	Call     Expression
+	CallArgs []Expression
 }
 
 func (c CallExpression) expression() {}
@@ -159,11 +159,11 @@ func (c CallExpression) Token() lexer.Token {
 
 func (c CallExpression) String() string {
 	buff := bytes.NewBuffer(make([]byte, 0))
-	buff.WriteString(c.f.String())
+	buff.WriteString(c.Call.String())
 	buff.WriteString("(")
-	for i, arg := range c.callArgs {
+	for i, arg := range c.CallArgs {
 		buff.WriteString(arg.String())
-		if i+1 != len(c.callArgs) {
+		if i+1 != len(c.CallArgs) {
 			buff.WriteString(",")
 		}
 	}

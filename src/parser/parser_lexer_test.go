@@ -44,7 +44,7 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 			return false
 		}
 	case IdentifierExpression:
-		if v.identifier.Literal != b.(IdentifierExpression).identifier.Literal {
+		if v.Identifier.Literal != b.(IdentifierExpression).Identifier.Literal {
 			return false
 		}
 	case LetStatement:
@@ -52,33 +52,33 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 			return false
 		}
 	case *BlockStatement:
-		if len(v.statements) != len(b.(*BlockStatement).statements) {
-			t.Errorf("Length of Blockstatement is not equal: %d, %d\n", len(v.statements), len(b.(*BlockStatement).statements))
+		if len(v.Statements) != len(b.(*BlockStatement).Statements) {
+			t.Errorf("Length of Blockstatement is not equal: %d, %d\n", len(v.Statements), len(b.(*BlockStatement).Statements))
 			return false
 		}
 
-		for i, _ := range v.statements {
-			if !AssertNodes(t, v.statements[i], b.(*BlockStatement).statements[i]) {
+		for i, _ := range v.Statements {
+			if !AssertNodes(t, v.Statements[i], b.(*BlockStatement).Statements[i]) {
 				return false
 			}
 		}
 	case BlockStatement:
-		if len(v.statements) != len(b.(BlockStatement).statements) {
-			t.Errorf("Length of Blockstatement is not equal: %d, %d\n", len(v.statements), len(b.(BlockStatement).statements))
+		if len(v.Statements) != len(b.(BlockStatement).Statements) {
+			t.Errorf("Length of Blockstatement is not equal: %d, %d\n", len(v.Statements), len(b.(BlockStatement).Statements))
 			return false
 		}
 
-		for i, _ := range v.statements {
-			if !AssertNodes(t, v.statements[i], b.(BlockStatement).statements[i]) {
+		for i, _ := range v.Statements {
+			if !AssertNodes(t, v.Statements[i], b.(BlockStatement).Statements[i]) {
 				return false
 			}
 		}
 	case IfExpression:
-		if !AssertNodes(t, v.condition, b.(IfExpression).condition) || !AssertNodes(t, v.consequence, b.(IfExpression).consequence) {
+		if !AssertNodes(t, v.Condition, b.(IfExpression).Condition) || !AssertNodes(t, v.Consequence, b.(IfExpression).Consequence) {
 			return false
 		}
 
-		if v.alternative != nil && !AssertNodes(t, v.alternative, b.(IfExpression).alternative) {
+		if v.Alternative != nil && !AssertNodes(t, v.Alternative, b.(IfExpression).Alternative) {
 			return false
 		}
 	case *InfixExpression:
@@ -99,23 +99,23 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 			return false
 		}
 	case FuncExpression:
-		if len(v.args) != len(b.(FuncExpression).args) {
+		if len(v.Args) != len(b.(FuncExpression).Args) {
 			t.Errorf("number of argumnets does not match\n")
 			return false
 		}
-		for i, _ := range v.args {
-			if !AssertNodes(t, v.args[i], b.(FuncExpression).args[i]) {
+		for i, _ := range v.Args {
+			if !AssertNodes(t, v.Args[i], b.(FuncExpression).Args[i]) {
 				return false
 			}
 		}
 
-		if len(v.body.statements) != len(b.(FuncExpression).body.statements) {
-			t.Errorf("number of Statements in body does not match\n")
+		if len(v.Body.Statements) != len(b.(FuncExpression).Body.Statements) {
+			t.Errorf("number of Statements in Body does not match\n")
 			return false
 		}
 
-		for i, _ := range v.body.statements {
-			return AssertNodes(t, v.body.statements[i], b.(FuncExpression).body.statements[i])
+		for i, _ := range v.Body.Statements {
+			return AssertNodes(t, v.Body.Statements[i], b.(FuncExpression).Body.Statements[i])
 		}
 	case AssignExpression:
 		if !AssertNodes(t, v.Identifier, b.(AssignExpression).Identifier) {
@@ -126,13 +126,30 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 			return false
 		}
 	case ReturnStatement:
-		if !AssertNodes(t, v.returnExpr, b.(ReturnStatement).returnExpr) {
+		if !AssertNodes(t, v.ReturnExpr, b.(ReturnStatement).ReturnExpr) {
 			return false
 		}
 
 		if v.token.Token != b.(ReturnStatement).token.Token && v.token.Literal != b.(ReturnStatement).token.Literal {
-			t.Logf("return statement tokens are different")
+			t.Errorf("return statement tokens are different")
 			return false
+		}
+	case CallExpression:
+		if !AssertNodes(t, v.Call, b.(CallExpression).Call) {
+			t.Errorf("failed to assert call expression: %q, %q\n", v.Call, b.(CallExpression).Call)
+			return false
+		}
+
+		if len(v.CallArgs) != len(b.(CallExpression).CallArgs) {
+			t.Errorf("failed to assert number of call argumnets, %d, %d\n", len(v.CallArgs), len(b.(CallExpression).CallArgs))
+			return false
+		}
+
+		for i, _ := range v.CallArgs {
+			if !AssertNodes(t, v.CallArgs[i], b.(CallExpression).CallArgs[i]) {
+				t.Errorf("failed to assert call args: %q, %q\n", v.CallArgs[i], b.(CallExpression).CallArgs[i])
+				return false
+			}
 		}
 	default:
 		t.Errorf("Not supported type %T\n", v)
@@ -403,7 +420,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 							Literal: "let",
 						},
 						Identifier: IdentifierExpression{
-							identifier: lexer.Token{
+							Identifier: lexer.Token{
 								Token:   lexer.IDENT,
 								Literal: "a",
 							},
@@ -418,7 +435,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 							Literal: "let",
 						},
 						Identifier: IdentifierExpression{
-							identifier: lexer.Token{
+							Identifier: lexer.Token{
 								Token:   lexer.IDENT,
 								Literal: "a",
 							},
@@ -451,7 +468,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 							Literal: "let",
 						},
 						Identifier: IdentifierExpression{
-							identifier: lexer.Token{
+							Identifier: lexer.Token{
 								Token:   lexer.IDENT,
 								Literal: "x",
 							},
@@ -470,7 +487,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 							Literal: "let",
 						},
 						Identifier: IdentifierExpression{
-							identifier: lexer.Token{
+							Identifier: lexer.Token{
 								Token:   lexer.IDENT,
 								Literal: "b",
 							},
@@ -489,9 +506,9 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 								Token:   lexer.IF,
 								Literal: "if",
 							},
-							condition: &InfixExpression{
+							Condition: &InfixExpression{
 								Left: IdentifierExpression{
-									identifier: lexer.Token{
+									Identifier: lexer.Token{
 										Token:   lexer.IDENT,
 										Literal: "a",
 									},
@@ -501,27 +518,27 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 									Literal: ">",
 								},
 								Right: IdentifierExpression{
-									identifier: lexer.Token{
+									Identifier: lexer.Token{
 										Token:   lexer.IDENT,
 										Literal: "b",
 									},
 								},
 							},
-							consequence: BlockStatement{
+							Consequence: BlockStatement{
 								token: lexer.Token{
 									Token:   lexer.BRLEFT,
 									Literal: "{",
 								},
-								statements: []Statement{
+								Statements: []Statement{
 									ExpressionStatement{
 										Expr: IfExpression{
 											token: lexer.Token{
 												Token:   lexer.IF,
 												Literal: "if",
 											},
-											condition: &InfixExpression{
+											Condition: &InfixExpression{
 												Left: IdentifierExpression{
-													identifier: lexer.Token{
+													Identifier: lexer.Token{
 														Token:   lexer.IDENT,
 														Line:    0,
 														Column:  0,
@@ -537,15 +554,15 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 													Val:   5,
 												},
 											},
-											consequence: BlockStatement{
-												statements: []Statement{
+											Consequence: BlockStatement{
+												Statements: []Statement{
 													LetStatement{
 														Literal: lexer.Token{
 															Token:   lexer.LET,
 															Literal: "let",
 														},
 														Identifier: IdentifierExpression{
-															identifier: lexer.Token{
+															Identifier: lexer.Token{
 																Token:   lexer.IDENT,
 																Literal: "b",
 															},
@@ -557,7 +574,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 													},
 												},
 											},
-											alternative: nil,
+											Alternative: nil,
 										},
 										Tok: lexer.Token{},
 									},
@@ -568,7 +585,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 											Literal: "let",
 										},
 										Identifier: IdentifierExpression{
-											identifier: lexer.Token{
+											Identifier: lexer.Token{
 												Token:   lexer.IDENT,
 												Literal: "a",
 											},
@@ -580,15 +597,15 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 									},
 								},
 							},
-							alternative: &BlockStatement{
-								statements: []Statement{
+							Alternative: &BlockStatement{
+								Statements: []Statement{
 									LetStatement{
 										Literal: lexer.Token{
 											Token:   lexer.LET,
 											Literal: "let",
 										},
 										Identifier: IdentifierExpression{
-											identifier: lexer.Token{
+											Identifier: lexer.Token{
 												Token:   lexer.IDENT,
 												Literal: "b",
 											},
@@ -624,33 +641,33 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 								Token:   lexer.FUNC,
 								Literal: "fn",
 							},
-							args: []IdentifierExpression{
+							Args: []IdentifierExpression{
 								{
-									identifier: lexer.Token{
+									Identifier: lexer.Token{
 										Token:   lexer.IDENT,
 										Literal: "a",
 									},
 								},
 								{
-									identifier: lexer.Token{
+									Identifier: lexer.Token{
 										Token:   lexer.IDENT,
 										Literal: "b",
 									},
 								},
 							},
-							body: BlockStatement{
+							Body: BlockStatement{
 								token: lexer.Token{
 									Token:   lexer.BRLEFT,
 									Literal: "{",
 								},
-								statements: []Statement{
+								Statements: []Statement{
 									LetStatement{
 										Literal: lexer.Token{
 											Token:   lexer.LET,
 											Literal: "let",
 										},
 										Identifier: IdentifierExpression{
-											identifier: lexer.Token{
+											Identifier: lexer.Token{
 												Token:   lexer.IDENT,
 												Literal: "let",
 											},
@@ -678,7 +695,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 								Literal: "=",
 							},
 							Identifier: IdentifierExpression{
-								identifier: lexer.Token{
+								Identifier: lexer.Token{
 									Token:   lexer.IDENT,
 									Literal: "a",
 								},
@@ -704,7 +721,7 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 							Token:   lexer.RETURN,
 							Literal: "return",
 						},
-						returnExpr: &InfixExpression{
+						ReturnExpr: &InfixExpression{
 							Left: IntegerExpression{
 								Val: 1,
 							},
@@ -714,6 +731,146 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 							},
 							Right: IntegerExpression{
 								Val: 1,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			i: "let a = 10;a return a;",
+			o: &RootNode{
+				Statements: []Statement{
+					LetStatement{
+						Literal: lexer.Token{
+							Token:   lexer.LET,
+							Literal: "let",
+						},
+						Identifier: IdentifierExpression{
+							Identifier: lexer.Token{
+								Token:   lexer.IDENT,
+								Literal: "a",
+							},
+						},
+						Expression: IntegerExpression{
+							Val: 10,
+						},
+					},
+					ExpressionStatement{
+						Expr: IdentifierExpression{
+							Identifier: lexer.Token{
+								Token:   lexer.IDENT,
+								Literal: "a",
+							},
+						},
+					},
+					ReturnStatement{
+						token: lexer.Token{
+							Token:   lexer.RETURN,
+							Line:    0,
+							Column:  0,
+							Literal: "return",
+						},
+						ReturnExpr: IdentifierExpression{
+							Identifier: lexer.Token{
+								Token:   lexer.IDENT,
+								Literal: "a",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			i: "let a = 10\nfn (a,b){}(a,b)",
+			o: &RootNode{
+				Statements: []Statement{
+					LetStatement{
+						Literal: lexer.Token{
+							Token:   lexer.LET,
+							Literal: "let",
+						},
+						Identifier: IdentifierExpression{
+							Identifier: lexer.Token{
+								Token:   lexer.IDENT,
+								Literal: "a",
+							},
+						},
+						Expression: IntegerExpression{
+							Val: 10,
+						},
+					},
+					ExpressionStatement{
+						Expr: CallExpression{
+							token: lexer.Token{},
+							Call: FuncExpression{
+								token: lexer.Token{},
+								Args: []IdentifierExpression{
+									{
+										Identifier: lexer.Token{
+											Token:   lexer.IDENT,
+											Literal: "a",
+										},
+									},
+									{
+										Identifier: lexer.Token{
+											Token:   lexer.IDENT,
+											Literal: "b",
+										},
+									},
+								},
+								Body: BlockStatement{},
+							},
+							CallArgs: []Expression{
+								IdentifierExpression{
+									Identifier: lexer.Token{
+										Token:   lexer.IDENT,
+										Literal: "a",
+									},
+								},
+								IdentifierExpression{
+									Identifier: lexer.Token{
+										Token:   lexer.IDENT,
+										Literal: "b",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			i: "a(a,b, c)",
+			o: &RootNode{
+				Statements: []Statement{
+					ExpressionStatement{
+						Expr: CallExpression{
+							Call: IdentifierExpression{
+								Identifier: lexer.Token{
+									Token:   lexer.IDENT,
+									Literal: "a",
+								},
+							},
+							CallArgs: []Expression{
+								IdentifierExpression{
+									Identifier: lexer.Token{
+										Token:   lexer.IDENT,
+										Literal: "a",
+									},
+								},
+								IdentifierExpression{
+									Identifier: lexer.Token{
+										Token:   lexer.IDENT,
+										Literal: "b",
+									},
+								},
+								IdentifierExpression{
+									Identifier: lexer.Token{
+										Token:   lexer.IDENT,
+										Literal: "c",
+									},
+								},
 							},
 						},
 					},

@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"github.com/charkpep/yad/src/lexer"
+	"io"
 )
 
 const (
@@ -239,7 +239,7 @@ func (p *Parser) precedence(token lexer.TokenType) int {
 		return MULTIPLICATION
 	case lexer.BANG:
 		return PREFIX
-	case lexer.FUNC, lexer.BLEFT:
+	case lexer.BLEFT:
 		return CALL
 	}
 

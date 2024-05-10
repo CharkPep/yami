@@ -19,7 +19,7 @@ type LetStatement struct {
 
 type ReturnStatement struct {
 	token      lexer.Token
-	returnExpr Expression
+	ReturnExpr Expression
 }
 
 func (r ReturnStatement) statement() {}
@@ -31,7 +31,7 @@ func (r ReturnStatement) Token() lexer.Token {
 func (r ReturnStatement) String() string {
 	buff := bytes.NewBuffer(make([]byte, 0))
 	buff.WriteString("return ")
-	buff.WriteString(r.returnExpr.String())
+	buff.WriteString(r.ReturnExpr.String())
 	buff.WriteString(";")
 	return buff.String()
 }
@@ -48,7 +48,7 @@ func (l LetStatement) String() string {
 
 type BlockStatement struct {
 	token      lexer.Token
-	statements []Statement
+	Statements []Statement
 }
 
 func (b BlockStatement) Token() lexer.Token {
@@ -60,7 +60,7 @@ func (b BlockStatement) statement() {}
 func (b BlockStatement) String() string {
 	buff := bytes.NewBuffer(make([]byte, 0))
 	buff.WriteString("{\n")
-	for _, st := range b.statements {
+	for _, st := range b.Statements {
 		buff.WriteString(st.String())
 	}
 	buff.WriteString("}")

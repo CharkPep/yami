@@ -1,13 +1,12 @@
-# Yad - yet another deez nuts
+# Yami - Yet another monkey interpreter
 
-msg hello?()
-    meme a = "69420"
-    dznats a
-JOKE
+Interpreter for **monkey language** described in [Interpreter in Go](https://interpreterbook.com) by Thorsten Ball.  
+As monkey language has no specification some features were added.    
 
-og x = 10
+## Features
 
-hello!
+### Added features
+
 
 
 

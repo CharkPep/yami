@@ -398,11 +398,11 @@ func TestParseBlockExpression(t *testing.T) {
 		t.Errorf("expected block expression, got %T", stmt)
 	}
 
-	if len(stmt.statements) != 1 {
-		t.Errorf("expected 1 statement, got %d", len(stmt.statements))
+	if len(stmt.Statements) != 1 {
+		t.Errorf("expected 1 statement, got %d", len(stmt.Statements))
 	}
 
-	AssertLetStatement(t, stmt.statements[0])
+	AssertLetStatement(t, stmt.Statements[0])
 }
 
 func TestParseIfExpression(t *testing.T) {
@@ -489,17 +489,17 @@ func TestParseIfExpression(t *testing.T) {
 		t.Errorf("expected if expression, got %T", ifExpr)
 	}
 
-	if !AssertNodes(t, ifExpr.condition, condition) {
-		t.Errorf("expected %q, got %q", condition, ifExpr.condition)
+	if !AssertNodes(t, ifExpr.Condition, condition) {
+		t.Errorf("expected %q, got %q", condition, ifExpr.Condition)
 	}
 
-	if len(ifExpr.consequence.statements) != 1 {
-		t.Errorf("expected %d, got %d Statements", 1, len(ifExpr.consequence.statements))
+	if len(ifExpr.Consequence.Statements) != 1 {
+		t.Errorf("expected %d, got %d Statements", 1, len(ifExpr.Consequence.Statements))
 	}
 
-	AssertLetStatement(t, ifExpr.consequence.statements[0])
-	if ifExpr.alternative != nil {
-		t.Errorf("expected alternative to be nil")
+	AssertLetStatement(t, ifExpr.Consequence.Statements[0])
+	if ifExpr.Alternative != nil {
+		t.Errorf("expected Alternative to be nil")
 	}
 
 }

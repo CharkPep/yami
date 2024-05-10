@@ -3,6 +3,7 @@ package eval
 import (
 	"bytes"
 	"fmt"
+	"github.com/charkpep/yad/src/lexer"
 	"github.com/charkpep/yad/src/object"
 	"github.com/charkpep/yad/src/parser"
 	"io"
@@ -10,7 +11,7 @@ import (
 	"testing"
 )
 
-func CreateEvaluator(t *testing.T, in io.Reader) object.Object {
+func EvaluteProgram(t *testing.T, in io.Reader) object.Object {
 	p := parser.NewParser(in)
 	root, err := p.Parse()
 	if err != nil {
@@ -34,23 +35,46 @@ func CreateEvaluator(t *testing.T, in io.Reader) object.Object {
 func AssertObjects(t *testing.T, a, b object.Object) bool {
 	t.Logf("Asserting %T and %T, %+v, %+v\n", a, b, a, b)
 	if reflect.ValueOf(a).Kind() != reflect.ValueOf(b).Kind() {
-		t.Logf("Got different value kinds: (%v, %s), (%v, %s)\n", a, reflect.ValueOf(a).Kind(), b, reflect.ValueOf(b).Kind())
+		t.Errorf("Got different value kinds: (%v, %s), (%v, %s)\n", a, reflect.ValueOf(a).Kind(), b, reflect.ValueOf(b).Kind())
 		return false
 	}
 
 	if reflect.TypeOf(a) != reflect.TypeOf(b) {
-		t.Logf("Got different value types: (%v, %T), (%v, %T)\n", a, a, b, b)
+		t.Errorf("Got different value types: (%v, %T), (%v, %T)\n", a, a, b, b)
 		return false
 	}
 
 	switch v := a.(type) {
 	case object.IntegerObject:
-		return v.Val != b.(object.IntegerObject).Val
+		if v.Val != b.(object.IntegerObject).Val {
+			t.Errorf("failed to assert integer objects: %v, %v\n", v, b)
+			return false
+		}
+	case object.BoolObject:
+		if v.Val != b.(object.BoolObject).Val {
+			t.Errorf("failed to assert bool objects: %v, %v\n", v, b)
+			return false
+		}
+	case object.FuncObject:
+		for i, param := range v.Args {
+			if param.String() != b.(object.FuncObject).Args[i].String() {
+				t.Errorf("failed to assert function identifiers, got: %s, %s\n", param, b.(object.FuncObject).Args[i])
+				return false
+			}
+		}
+
+		if v.Body.String() != b.(object.FuncObject).Body.String() {
+			t.Errorf("failed to assert string representation of function body")
+			return false
+		}
+	case object.NilObject:
+		return true
 	default:
 		t.Errorf("Not implemented for object %T\n", a)
 		return false
 	}
 
+	return true
 }
 
 func TestEvalArithmetic(t *testing.T) {
@@ -80,7 +104,7 @@ func TestEvalArithmetic(t *testing.T) {
 
 	for i, test := range ts {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			obj := CreateEvaluator(t, bytes.NewBufferString(test.i))
+			obj := EvaluteProgram(t, bytes.NewBufferString(test.i))
 			if obj.Inspect() != test.e {
 				t.Errorf("expected %s, got %s\n", test.e, obj.Inspect())
 			}
@@ -88,7 +112,7 @@ func TestEvalArithmetic(t *testing.T) {
 	}
 }
 
-func TestAssignment(t *testing.T) {
+func TestEval(t *testing.T) {
 	type tt struct {
 		i string
 		o object.Object
@@ -107,11 +131,173 @@ func TestAssignment(t *testing.T) {
 				Val: 20,
 			},
 		},
+		{
+			i: "let a = -10;\na",
+			o: object.IntegerObject{
+				Val: -10,
+			},
+		},
+		{
+			i: "let a = !true;\na",
+			o: object.BoolObject{
+				Val: false,
+			},
+		},
+		{
+			i: `if 10 == 10 {
+					10
+				}`,
+			o: object.IntegerObject{
+				Val: 10,
+			},
+		},
+		{
+			i: `let a = 10
+				if a > 10 {
+					a
+				} else {
+					a = 2000
+					a
+				}`,
+			o: object.IntegerObject{
+				Val: 2000,
+			},
+		},
+		{
+			"let a = 10;\nreturn a; a=20",
+			object.IntegerObject{
+				Val: 10,
+			},
+		},
+		{
+			"{\nlet a = 10}\nlet a = 5;\na",
+			object.IntegerObject{
+				Val: 5,
+			},
+		},
+		{
+			`{
+					let a = 10
+					return a
+					a = 20
+				}`,
+			object.IntegerObject{
+				Val: 10,
+			},
+		},
+		{
+			`fn (b, c) {}`,
+			object.FuncObject{
+				Args: []parser.IdentifierExpression{
+					{
+						Identifier: lexer.Token{
+							Token:   lexer.IDENT,
+							Literal: "b",
+						},
+					},
+					{
+						Identifier: lexer.Token{
+							Token:   lexer.IDENT,
+							Literal: "c",
+						},
+					},
+				},
+				Body: parser.BlockStatement{},
+			},
+		},
+		{
+			`let a = fn (b, c) {}`,
+			object.FuncObject{
+				Args: []parser.IdentifierExpression{
+					{
+						Identifier: lexer.Token{
+							Token:   lexer.IDENT,
+							Literal: "b",
+						},
+					},
+					{
+						Identifier: lexer.Token{
+							Token:   lexer.IDENT,
+							Literal: "c",
+						},
+					},
+				},
+				Body: parser.BlockStatement{},
+			},
+		},
+		{
+			`let b = 1
+				let c = 2
+			fn (b, c) {b}(b,c)`,
+			object.IntegerObject{
+				Val: 1,
+			},
+		},
+		{
+			`let b = 1
+			let c = 2
+			fn (b, c) {
+				b
+				return c
+				b
+			}(b,c)`,
+			object.IntegerObject{
+				Val: 2,
+			},
+		},
+		{
+			`let add = fn (a, num) {
+				return a + num
+			}
+			return add(2, add(2, 10))	
+			`,
+			object.IntegerObject{
+				Val: 14,
+			},
+		},
+		{
+			`let factor = fn(n) {
+				if n == 1 { return 1 }
+				return n*factor(n-1)
+			}
+			return factor(5)`,
+			object.IntegerObject{
+				Val: 120,
+			},
+		},
+		{
+			`if 1 == 1 {
+				return 1
+			 }
+			return 2`,
+			object.IntegerObject{
+				Val: 1,
+			},
+		},
+		{
+			`let n = 10;
+			let fib = fn (cur, prev, cur_n) {
+					if cur_n == n {
+						return cur
+					}
+					return fib(cur + prev, cur, cur_n + 1)
+				}
+			fib(0, 1, 0)
+			`,
+			object.IntegerObject{
+				Val: 55,
+			},
+		},
+		{
+			`if 1==0 {return 0}`,
+			object.NilObject{},
+		},
 	}
 
 	for i, test := range ts {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			obj := CreateEvaluator(t, bytes.NewBufferString(test.i))
+			//t.Parallel()
+			obj := EvaluteProgram(t, bytes.NewBufferString(test.i))
 			AssertObjects(t, obj, test.o)
 		})
 	}

@@ -27,7 +27,7 @@ func (p *Parser) parseIdentifier() (Expression, error) {
 		return nil, NewParsingError("expected Identifier", p.lex.CurToken())
 	}
 	return IdentifierExpression{
-		identifier: literal,
+		Identifier: literal,
 	}, nil
 }
 
@@ -103,7 +103,7 @@ func (p *Parser) parseBlockStatement() Statement {
 	for !p.isCurToken(lexer.EOF) && !p.isCurToken(lexer.BRRIGHT) {
 		st := p.parseStatement()
 		if st != nil {
-			block.statements = append(block.statements, st)
+			block.Statements = append(block.Statements, st)
 		}
 		p.lex.Advance()
 	}
@@ -120,7 +120,7 @@ func (p *Parser) parseIfExpression() (Expression, error) {
 	var err error
 	ifExpr := IfExpression{
 		token:       p.lex.CurToken(),
-		consequence: BlockStatement{},
+		Consequence: BlockStatement{},
 	}
 
 	p.lex.Advance()
@@ -128,13 +128,13 @@ func (p *Parser) parseIfExpression() (Expression, error) {
 		p.lex.Advance()
 	}
 
-	ifExpr.condition, err = p.parseExpression(LOWEST)
+	ifExpr.Condition, err = p.parseExpression(LOWEST)
 	if err != nil {
 		return nil, err
 	}
 
-	if ifExpr.condition == nil {
-		return nil, NewParsingError("undefined condition", ifExpr.token)
+	if ifExpr.Condition == nil {
+		return nil, NewParsingError("undefined Condition", ifExpr.token)
 	}
 
 	// So far
@@ -147,20 +147,20 @@ func (p *Parser) parseIfExpression() (Expression, error) {
 
 	consequence := p.parseBlockStatement()
 	if consequence == nil {
-		return nil, NewParsingError("undefined required consequence of if expression", p.lex.CurToken())
+		return nil, NewParsingError("undefined required Consequence of if expression", p.lex.CurToken())
 	}
 
-	ifExpr.consequence = consequence.(BlockStatement)
+	ifExpr.Consequence = consequence.(BlockStatement)
 	if p.lex.PeekToken().Token == lexer.ELSE {
 		p.lex.Advance()
 		p.lex.Advance()
 		alternative := p.parseBlockStatement()
 		if alternative == nil {
-			return nil, NewParsingError("expected alternative, got none", ifExpr.token)
+			return nil, NewParsingError("expected Alternative, got none", ifExpr.token)
 		}
 
 		alternativeBlock := alternative.(BlockStatement)
-		ifExpr.alternative = &alternativeBlock
+		ifExpr.Alternative = &alternativeBlock
 	}
 
 	return ifExpr, err
@@ -176,7 +176,7 @@ func (p *Parser) ParseFuncExpression() (Expression, error) {
 		return nil, NewParsingError("expected (", p.lex.CurToken())
 	}
 
-	// First element in args
+	// First element in Args
 	p.lex.Advance()
 	if !p.isCurToken(lexer.BRIGHT) {
 		args, err := p.parseComaSeparatedExpressions()
@@ -189,7 +189,7 @@ func (p *Parser) ParseFuncExpression() (Expression, error) {
 			if !ok {
 				return nil, NewParsingError("expected Identifier", arg.Token())
 			}
-			fn.args = append(fn.args, ident)
+			fn.Args = append(fn.Args, ident)
 		}
 
 		p.lex.Advance()
@@ -202,10 +202,10 @@ func (p *Parser) ParseFuncExpression() (Expression, error) {
 	p.lex.Advance()
 	body := p.parseBlockStatement()
 	if body == nil {
-		return nil, NewParsingError("if body is undefined", p.lex.CurToken())
+		return nil, NewParsingError("if Body is undefined", p.lex.CurToken())
 	}
 
-	fn.body = body.(BlockStatement)
+	fn.Body = body.(BlockStatement)
 	return fn, nil
 }
 
@@ -234,13 +234,13 @@ func (p *Parser) parseComaSeparatedExpressions() ([]Expression, error) {
 func (p *Parser) parseCallExpression(fn Expression) (Expression, error) {
 	call := CallExpression{
 		token: p.lex.CurToken(),
-		f:     fn,
+		Call:  fn,
 	}
 
 	p.lex.Advance()
 	if !p.isCurToken(lexer.BRIGHT) {
 		var err error
-		call.callArgs, err = p.parseComaSeparatedExpressions()
+		call.CallArgs, err = p.parseComaSeparatedExpressions()
 		if err != nil {
 			return nil, err
 		}
@@ -290,7 +290,7 @@ func (p *Parser) parseReturnStatement() (Statement, error) {
 
 	p.lex.Advance()
 	var err error
-	rt.returnExpr, err = p.parseExpression(LOWEST)
+	rt.ReturnExpr, err = p.parseExpression(LOWEST)
 	if err != nil {
 		return nil, err
 	}

@@ -1,20 +1,26 @@
 package object
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"github.com/charkpep/yad/src/parser"
+	"strings"
+)
 
 var (
+	FUNC_OBJ    ObjectType = "FUNC"
+	RETURN_OBJ  ObjectType = "RETURN"
 	INTEGER_OBJ ObjectType = "INTEGER"
 	BOOL_OBJ    ObjectType = "BOOL"
 	NIL_OBJ     ObjectType = "NIL"
 )
 
 type IntegerObject struct {
-	OType ObjectType
-	Val   int64
+	Val int64
 }
 
 func (i IntegerObject) Type() ObjectType {
-	return i.OType
+	return INTEGER_OBJ
 }
 
 func (i IntegerObject) Inspect() string {
@@ -22,14 +28,66 @@ func (i IntegerObject) Inspect() string {
 }
 
 type BoolObject struct {
-	OType ObjectType
-	Val   bool
+	Val bool
 }
 
 func (b BoolObject) Type() ObjectType {
-	return b.OType
+	return BOOL_OBJ
 }
 
 func (b BoolObject) Inspect() string {
 	return fmt.Sprint(b.Val)
+}
+
+type NilObject struct{}
+
+func (n NilObject) Inspect() string {
+	return "nil"
+}
+
+func (n NilObject) Type() ObjectType {
+	return NIL_OBJ
+}
+
+type ReturnObject struct {
+	Val Object
+}
+
+func (r ReturnObject) Type() ObjectType {
+	return RETURN_OBJ
+}
+
+func (r ReturnObject) Inspect() string {
+	return r.Val.Inspect()
+}
+
+type FuncObject struct {
+	Args []parser.IdentifierExpression
+	Body parser.BlockStatement
+}
+
+func (f FuncObject) Type() ObjectType {
+	return FUNC_OBJ
+}
+
+func (f FuncObject) Inspect() string {
+	var buff bytes.Buffer
+
+	buff.WriteString("fn (")
+	params := make([]string, 0, len(f.Args))
+	for _, arg := range f.Args {
+		params = append(params, arg.String())
+	}
+
+	buff.WriteString(strings.Join(params, ","))
+	buff.WriteString(")")
+	buff.WriteString(f.Body.String())
+	return buff.String()
+}
+
+func NewFuncObject(args []parser.IdentifierExpression, body parser.BlockStatement) FuncObject {
+	return FuncObject{
+		Args: args,
+		Body: body,
+	}
 }

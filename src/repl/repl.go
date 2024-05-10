@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"github.com/charkpep/yad/src/eval"
 	"github.com/charkpep/yad/src/lexer"
 	"github.com/charkpep/yad/src/parser"
+	"io"
 )
 
 type Repl struct {
@@ -64,6 +64,6 @@ func (r Repl) Start() {
 			continue
 		}
 
-		fmt.Println(obj)
+		fmt.Println(obj.Inspect())
 	}
 }
