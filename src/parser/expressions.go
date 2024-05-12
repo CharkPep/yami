@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/charkpep/yad/src/lexer"
+	"strings"
 )
 
 type Expression interface {
@@ -215,4 +216,73 @@ func (str StringExpression) expression() {}
 
 func (str StringExpression) String() string {
 	return fmt.Sprintf(`"%s"`, str.Val)
+}
+
+// a[1] -> array index, str[1] -> string index, hmap[Any Expression] -> hashmap index
+type IndexExpression struct {
+	token lexer.Token
+	Of    Expression
+	Idx   Expression
+}
+
+func (idx IndexExpression) Token() lexer.Token {
+	return idx.token
+}
+
+func (idx IndexExpression) expression() {}
+
+func (idx IndexExpression) String() string {
+	var buff bytes.Buffer
+	buff.WriteString(idx.Of.String())
+	buff.WriteString("[")
+	buff.WriteString(idx.Idx.String())
+	buff.WriteString("]")
+	return buff.String()
+}
+
+type ArrayExpression struct {
+	Arr   []Expression
+	token lexer.Token
+}
+
+func (arr ArrayExpression) Token() lexer.Token {
+	return arr.token
+}
+
+func (arr ArrayExpression) expression() {}
+
+func (arr ArrayExpression) String() string {
+	var buff bytes.Buffer
+	buff.WriteString("[")
+	expressions := make([]string, 0, len(arr.Arr))
+	for _, expr := range arr.Arr {
+		expressions = append(expressions, expr.String())
+	}
+	buff.WriteString(strings.Join(expressions, ","))
+	buff.WriteString("]")
+	return buff.String()
+}
+
+type HashMapExpression struct {
+	Map   map[Expression]Expression
+	token lexer.Token
+}
+
+func (mp HashMapExpression) String() string {
+	var buff bytes.Buffer
+	buff.WriteString("{")
+	elements := make([]string, 0, len(mp.Map))
+	for k, v := range mp.Map {
+		elements = append(elements, fmt.Sprintf("%s:%s", k.String(), v.String()))
+	}
+
+	buff.WriteString(strings.Join(elements, ","))
+	buff.WriteString("}")
+	return buff.String()
+}
+
+func (mp HashMapExpression) expression() {}
+
+func (mp HashMapExpression) Token() lexer.Token {
+	return mp.token
 }

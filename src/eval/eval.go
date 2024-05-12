@@ -6,16 +6,6 @@ import (
 	"github.com/charkpep/yad/src/parser"
 )
 
-var (
-	TRUE = object.BoolObject{
-		Val: true,
-	}
-	FALSE = object.BoolObject{
-		Val: false,
-	}
-	NIL = object.NilObject{}
-)
-
 type RuntimeError struct {
 	msg  string
 	node parser.Node
@@ -104,7 +94,7 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 			return e.evalBlockStatement(*v.Alternative, env)
 		}
 
-		return NIL, nil
+		return object.NIL, nil
 	case parser.FuncExpression:
 		return object.NewFuncObject(v.Args, v.Body), nil
 	case parser.BlockStatement:
@@ -121,11 +111,16 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 		}, nil
 	case parser.IdentifierExpression:
 		val, ok := env.Get(v.Token().Literal)
-		if !ok {
-			return nil, NewRuntimeError("identifier is not defined", v)
+		if ok {
+			return val, nil
 		}
 
-		return val, nil
+		val, ok = object.BuildIns[v.Token().Literal]
+		if ok {
+			return val, nil
+		}
+
+		return nil, NewRuntimeError("identifier is not defined", v)
 	case parser.PrefixExpression:
 		return e.evalPrefix(v, env)
 	case parser.BoolExpression:
@@ -139,9 +134,83 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 		return object.StringObject{
 			Val: v.Val,
 		}, nil
+	case parser.IndexExpression:
+		return e.evalIndex(v, env)
+	case parser.ArrayExpression:
+		return e.evalArray(v, env)
+	case parser.HashMapExpression:
+		return e.evalMap(v, env)
 	default:
 		return nil, fmt.Errorf("unsupported node %T\n", v)
 	}
+}
+
+func (e Evaluator) evalMap(mp parser.HashMapExpression, env *object.Environment) (object.Object, error) {
+	mpObj := object.MapObject{
+		Val: make(map[object.Object]object.Object),
+	}
+
+	for k, v := range mp.Map {
+		key, err := e.eval(k, env)
+		if err != nil {
+			return nil, err
+		}
+		val, err := e.eval(v, env)
+		if err != nil {
+			return nil, err
+		}
+
+		mpObj.Val[key] = val
+	}
+
+	return mpObj, nil
+}
+
+func (e Evaluator) evalArray(arrExpr parser.ArrayExpression, env *object.Environment) (object.Object, error) {
+	arr := object.ArrayObject{
+		Val: make([]object.Object, 0, len(arrExpr.Arr)),
+	}
+
+	for _, expr := range arrExpr.Arr {
+		obj, err := e.eval(expr, env)
+		if err != nil {
+			return nil, err
+		}
+		arr.Val = append(arr.Val, obj)
+	}
+
+	return arr, nil
+}
+func (e Evaluator) evalIndex(expr parser.IndexExpression, env *object.Environment) (object.Object, error) {
+	ofObj, err := e.eval(expr.Of, env)
+	if err != nil {
+		return nil, err
+	}
+
+	idx, err := e.eval(expr.Idx, env)
+	if err != nil {
+		return nil, err
+	}
+
+	switch {
+	case idx.Type() == object.INTEGER_OBJ && ofObj.Type() == object.STRING_OBJ:
+		index := idx.(object.IntegerObject).Val
+		str := ofObj.(object.StringObject).Val
+		if index >= int64(len(str)) {
+			return nil, NewRuntimeError("index out of bounds", expr)
+		}
+
+		return object.StringObject{
+			Val: string(str[index]),
+		}, nil
+	case idx.Type() == object.INTEGER_OBJ && ofObj.Type() == object.ARRAY_OBJ:
+		return ofObj.(object.ArrayObject).Val[idx.(object.IntegerObject).Val], nil
+	case ofObj.Type() == object.MAP_OBJ:
+		return ofObj.(object.MapObject).Val[idx], nil
+	default:
+		return nil, NewRuntimeError("unexpected index type for expression", expr)
+	}
+
 }
 
 func (e Evaluator) evalBlockStatement(stmt parser.BlockStatement, env *object.Environment) (object.Object, error) {
@@ -169,26 +238,47 @@ func (e Evaluator) evalCallExpression(expr parser.CallExpression, env *object.En
 		return nil, err
 	}
 
-	call, ok := callObj.(object.FuncObject)
-	if !ok {
+	switch call := callObj.(type) {
+	case object.FuncObject:
+		if len(call.Args) != len(expr.CallArgs) {
+			return nil, NewRuntimeError("mismatching number of arguments", expr)
+		}
+
+		derivedEvn := object.DeriveEnv(env)
+		objs, err := e.evalExpressions(expr.CallArgs, env)
+		if err != nil {
+			return nil, err
+		}
+
+		for i, k := range call.Args {
+			derivedEvn.Set(k.Identifier.Literal, objs[i])
+		}
+		return e.evalStatements(call.Body.Statements, derivedEvn)
+	case object.BuildInFunc:
+		objs, err := e.evalExpressions(expr.CallArgs, env)
+		if err != nil {
+			return nil, err
+		}
+		return call(objs...)
+	default:
 		return nil, NewRuntimeError("expected function expression", expr)
 	}
 
-	if len(call.Args) != len(expr.CallArgs) {
-		return nil, NewRuntimeError("mismatching number of arguments", expr)
-	}
+}
 
-	derivedEvn := object.DeriveEnv(env)
-	for i, arg := range expr.CallArgs {
+func (e Evaluator) evalExpressions(args []parser.Expression, env *object.Environment) ([]object.Object, error) {
+	objs := make([]object.Object, 0, len(args))
+	for _, arg := range args {
 		obj, err := e.eval(arg, env)
 		if err != nil {
 			return nil, err
 		}
 
-		derivedEvn.Set(call.Args[i].Identifier.Literal, obj)
+		objs = append(objs, obj)
 	}
 
-	return e.evalStatements(call.Body.Statements, derivedEvn)
+	return objs, nil
+
 }
 
 func (e Evaluator) evalStatements(stmts []parser.Statement, env *object.Environment) (object.Object, error) {
@@ -239,7 +329,7 @@ func (e Evaluator) evalInfix(infix *parser.InfixExpression, env *object.Environm
 
 	}
 
-	return nil, fmt.Errorf("not supported types")
+	return nil, NewRuntimeError("not supported types", infix)
 }
 
 func (e Evaluator) evalInfixInteger(infix *parser.InfixExpression, left, right object.IntegerObject) (object.Object, error) {
@@ -283,6 +373,22 @@ func (e Evaluator) evalInfixInteger(infix *parser.InfixExpression, left, right o
 	case "|":
 		return object.IntegerObject{
 			Val: left.Val | right.Val,
+		}, nil
+	case "<<":
+		return object.IntegerObject{
+			Val: left.Val << right.Val,
+		}, nil
+	case ">>":
+		return object.IntegerObject{
+			Val: left.Val >> right.Val,
+		}, nil
+	case "||":
+		return object.BoolObject{
+			Val: left.Val > 0 || right.Val > 0,
+		}, nil
+	case "&&":
+		return object.BoolObject{
+			Val: left.Val > 0 && right.Val > 0,
 		}, nil
 	default:
 		return nil, NewRuntimeError("operator is not supported for int types", infix)
@@ -345,11 +451,12 @@ func (e Evaluator) evalObjToBool(obj object.Object) (object.BoolObject, error) {
 		return v, nil
 	case object.IntegerObject:
 		if v.Val >= 1 {
-			return TRUE, nil
+			return object.TRUE, nil
 		}
-		return FALSE, nil
+		return object.FALSE, nil
 	default:
-		return FALSE, fmt.Errorf("unexpected node")
+		return object.FALSE, fmt.Errorf("unexpected node")
+
 	}
 }
 
@@ -367,8 +474,8 @@ func (e Evaluator) boolObjToInt(obj object.BoolObject) object.IntegerObject {
 
 func (e Evaluator) nativeBoolToObj(val bool) object.BoolObject {
 	if val {
-		return TRUE
+		return object.TRUE
 	}
 
-	return FALSE
+	return object.FALSE
 }

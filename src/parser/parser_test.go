@@ -356,10 +356,55 @@ func TestParseExpression(t *testing.T) {
 			}),
 			o: "(true && false)\n",
 		},
+		{
+			utils.NewMockLexer([]lexer.Token{
+				{
+					Token:   lexer.SBLEFT,
+					Literal: "[",
+				},
+				{
+					Token:   lexer.NUMBER,
+					Literal: "1",
+				},
+				{
+					Token:   lexer.COMA,
+					Literal: ",",
+				},
+				{
+					Token:   lexer.NUMBER,
+					Literal: "2",
+				},
+				{
+					Token:   lexer.COMA,
+					Literal: ",",
+				},
+				{
+					Token:   lexer.NUMBER,
+					Literal: "3",
+				},
+				{
+					Token:   lexer.SBRIGHT,
+					Literal: "]",
+				},
+			}),
+			"[1,2,3]\n",
+		},
+		{
+			utils.NewMockLexer([]lexer.Token{
+				{
+					Token:   lexer.SBLEFT,
+					Literal: "[",
+				},
+				{
+					Token:   lexer.SBRIGHT,
+					Literal: "]",
+				},
+			}),
+			"[]\n",
+		},
 	}
 
 	for i, test := range tcs {
-		t.Log(test.i)
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
 			parser := NewParserFromLexer(test.i)
 			node, err := parser.Parse()
@@ -374,7 +419,6 @@ func TestParseExpression(t *testing.T) {
 			if node.String() != test.o {
 				t.Errorf("expected %q, got %q", test.o, node.String())
 			}
-			t.Logf(node.String())
 		})
 	}
 }
@@ -556,6 +600,38 @@ func TestStringParsing(t *testing.T) {
 
 	if str.Val != expected {
 		t.Errorf("expected string: %s, got: %s\n", expected, str.Val)
+	}
+}
+
+func TestIndexExpression(t *testing.T) {
+	i := `"hello"[0]`
+	p := NewParser(bytes.NewBufferString(i))
+	rootNode, err := p.Parse()
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(p.Errors) != 0 {
+		t.Error(p.Errors)
+	}
+
+	root := AssertRoot(t, rootNode)
+	if len(root.Statements) != 1 {
+		t.Errorf("expected 1 statement, got %d\n", len(root.Statements))
+	}
+
+	expr := AssertExpressionStatement(t, root.Statements[0])
+	idxExpr, ok := expr.Expr.(IndexExpression)
+	if !ok {
+		t.Errorf("expected %T, got %T\n", IndexExpression{}, expr.Expr)
+	}
+
+	if _, ok := idxExpr.Of.(StringExpression); !ok {
+		t.Errorf("Expected %T, got %T\n", StringExpression{}, idxExpr.Of)
+	}
+
+	if _, ok := idxExpr.Idx.(IntegerExpression); !ok {
+		t.Errorf("Expected %T, got %T\n", IndexExpression{}, idxExpr.Of)
 	}
 
 }

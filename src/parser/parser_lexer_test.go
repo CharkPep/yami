@@ -10,7 +10,7 @@ import (
 
 func AssertNodes(t *testing.T, a, b Node) bool {
 	t.Helper()
-	t.Logf("Asserting %T and %T, %+v, %+v\n", a, b, a, b)
+	t.Logf("Asserting %T and %T, %q, %q\n", a, b, a, b)
 	if reflect.ValueOf(a).Kind() != reflect.ValueOf(b).Kind() {
 		t.Logf("Got different value kinds: (%v, %s), (%v, %s)\n", a, reflect.ValueOf(a).Kind(), b, reflect.ValueOf(b).Kind())
 		return false
@@ -153,15 +153,50 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 		}
 	case BoolExpression:
 		if v.Val != b.(BoolExpression).Val {
-			t.Errorf("Failed to assert bools: %v, %v\n", v.Val, b.(BoolExpression).Val)
+			t.Errorf("failed to assert bools: %v, %v\n", v.Val, b.(BoolExpression).Val)
 			return false
 		}
+	case StringExpression:
+		if v.Val != b.(StringExpression).Val {
+			t.Errorf("failed to assert strings: %q, %q\n", v.Val, b.(StringExpression).Val)
+			return false
+		}
+	case ArrayExpression:
+		if len(v.Arr) != len(b.(ArrayExpression).Arr) {
+			t.Errorf("failed to assert array lenghtes\n")
+			return false
+		}
+
+		for i := range v.Arr {
+			if !AssertNodes(t, v.Arr[i], b.(ArrayExpression).Arr[i]) {
+				return false
+			}
+		}
+	case HashMapExpression:
+		if len(v.Map) != len(b.(HashMapExpression).Map) {
+			t.Errorf("failed to assert map lengthes\n")
+		}
+
 	default:
 		t.Errorf("Not supported type %T\n", v)
 		return false
 	}
 
 	return true
+}
+
+func ParseRoot(t *testing.T, in []byte) *RootNode {
+	p := NewParser(bytes.NewBuffer(in))
+	root, err := p.Parse()
+	if err != nil {
+		t.Errorf("failed to parse %s\n", err)
+	}
+
+	if len(p.Errors) != 0 {
+		t.Error(p.Errors)
+	}
+
+	return root.(*RootNode)
 }
 
 func TestArithmeticAndLogicOperations(t *testing.T) {
@@ -384,16 +419,7 @@ func TestArithmeticAndLogicOperations(t *testing.T) {
 	}
 
 	for _, test := range ts {
-		p := NewParser(bytes.NewBufferString(test.i))
-		root, err := p.Parse()
-		if err != nil {
-			t.Error(err)
-		}
-
-		if len(p.Errors) != 0 {
-			t.Error(p.Errors)
-		}
-
+		root := ParseRoot(t, []byte(test.i))
 		rootNode := AssertRoot(t, root)
 		if len(rootNode.Statements) != 1 {
 			t.Errorf("expected 1, got %d", len(rootNode.Statements))
@@ -937,25 +963,178 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 				},
 			},
 		},
+		{
+			i: `[1, [1, [2]], ["string"]]`,
+			o: &RootNode{
+				Statements: []Statement{
+					ExpressionStatement{
+						Expr: ArrayExpression{
+							Arr: []Expression{
+								IntegerExpression{
+									token: lexer.Token{
+										Token:   lexer.NUMBER,
+										Literal: "1",
+									},
+									Val: 1,
+								},
+								ArrayExpression{
+									Arr: []Expression{
+										IntegerExpression{
+											token: lexer.Token{
+												Token:   lexer.NUMBER,
+												Literal: "1",
+											},
+											Val: 1,
+										},
+										ArrayExpression{
+											Arr: []Expression{
+												IntegerExpression{
+													token: lexer.Token{
+														Token:   lexer.NUMBER,
+														Literal: "2",
+													},
+													Val: 2,
+												},
+											},
+											token: lexer.Token{
+												Token:   lexer.SBLEFT,
+												Literal: "[",
+											},
+										},
+									},
+									token: lexer.Token{
+										Token:   lexer.SBLEFT,
+										Literal: "[",
+									},
+								},
+								ArrayExpression{
+									Arr: []Expression{
+										StringExpression{
+											tok: lexer.Token{
+												Token:   lexer.STRING,
+												Literal: "string",
+											},
+											Val: "string",
+										},
+									},
+									token: lexer.Token{
+										Token:   lexer.SBLEFT,
+										Literal: "[",
+									},
+								},
+							},
+							token: lexer.Token{
+								Token:   lexer.SBLEFT,
+								Literal: "[",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			`let a={}`,
+			&RootNode{
+				Statements: []Statement{
+					LetStatement{
+						Literal: lexer.Token{
+							Token:   lexer.LET,
+							Literal: "let",
+						},
+						Identifier: IdentifierExpression{
+							Identifier: lexer.Token{
+								Token:   lexer.IDENT,
+								Literal: "a",
+							},
+						},
+						Expression: HashMapExpression{
+							Map: make(map[Expression]Expression),
+						},
+					},
+				},
+			},
+		},
+		{
+			`let a = { "a" : "b", true: {}, 1 : 1}`,
+			&RootNode{
+				Statements: []Statement{
+					LetStatement{
+						Literal: lexer.Token{
+							Token:   lexer.LET,
+							Literal: "let",
+						},
+						Identifier: IdentifierExpression{
+							Identifier: lexer.Token{
+								Token:   lexer.IDENT,
+								Literal: "a",
+							},
+						},
+						Expression: HashMapExpression{
+							Map: map[Expression]Expression{
+								StringExpression{
+									Val: "a",
+								}: StringExpression{
+									Val: "b",
+								},
+								BoolExpression{
+									Val: true,
+								}: HashMapExpression{
+									Map: map[Expression]Expression{},
+								},
+								IntegerExpression{
+									Val: 1,
+								}: IntegerExpression{
+									Val: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			`[[]]`,
+			&RootNode{
+				Statements: []Statement{
+					ExpressionStatement{
+						Expr: ArrayExpression{
+							Arr: []Expression{
+								ArrayExpression{
+									Arr: []Expression{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for i, test := range ts {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			p := NewParser(bytes.NewBuffer([]byte(test.i)))
-			root, err := p.Parse()
-			if err != nil {
-				t.Error(err)
-			}
-
-			if len(p.Errors) != 0 {
-				t.Error(p.Errors)
-			}
+			root := ParseRoot(t, []byte(test.i))
 
 			if !AssertNodes(t, root, test.o.(*RootNode)) {
 				t.Errorf("Assertion failed, expected %q, got %q", test.o, root)
 			}
 		})
 
+	}
+
+}
+
+func TestHashMap(t *testing.T) {
+	in := `let a = { "a" : "b", true: false, 1 : 1}`
+
+	root := ParseRoot(t, []byte(in))
+	if len(root.Statements) != 1 {
+		t.Errorf("expected 1 statement, got %d\n", len(root.Statements))
+	}
+
+	expr := AssertLetStatement(t, root.Statements[0])
+	_, ok := expr.Expression.(HashMapExpression)
+	if !ok {
+		t.Errorf("expected map, got %T\n", expr.Expression)
 	}
 
 }

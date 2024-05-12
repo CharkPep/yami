@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func EvaluteProgram(t *testing.T, in io.Reader) object.Object {
+func EvaluateProgram(t *testing.T, in io.Reader) object.Object {
 	p := parser.NewParser(in)
 	root, err := p.Parse()
 	if err != nil {
@@ -74,6 +74,29 @@ func AssertObjects(t *testing.T, a, b object.Object) bool {
 			t.Errorf("failed to assert string values")
 			return false
 		}
+	case object.ArrayObject:
+		bArr := b.(object.ArrayObject)
+		if len(v.Val) != len(bArr.Val) {
+			t.Errorf("failed to assert array lengthes")
+			return false
+		}
+
+		for i := range v.Val {
+			if !AssertObjects(t, v.Val[i], b.(object.ArrayObject).Val[i]) {
+				return false
+			}
+		}
+	case object.MapObject:
+		if len(v.Val) != len(b.(object.MapObject).Val) {
+			t.Errorf("failed to assert map lengthes")
+			return false
+		}
+
+		for k := range v.Val {
+			if !AssertObjects(t, v.Val[k], b.(object.MapObject).Val[k]) {
+				return false
+			}
+		}
 	default:
 		t.Errorf("Not implemented for object %T\n", a)
 		return false
@@ -103,14 +126,21 @@ func TestEvalArithmetic(t *testing.T) {
 		{"1 + false", "1"},
 		{"10 + false", "10"},
 		{`"hello " + "world"`, "hello world"},
-		// TODO add bitwise operators
-		//{"4 & 12", "4"},
-		//{"4 & 12", "12"},
+		{`"" + "hello"`, `hello`},
+		{`"hello"[0]`, "h"},
+		{`"f"[0]`, "f"},
+		{"4 & 12", "4"},
+		{"4 | 12", "12"},
+		{"1 << 16", fmt.Sprint(1 << 16)},
+		{"256 >> 7", "2"},
+		{"1 || 1", "true"},
+		{"(256 >> 7 < 256 >> 6) || 256 << 7 ", "true"},
+		{"(256 >> 7 < 256 >> 6) && 256 << 7 ", "true"},
 	}
 
 	for i, test := range ts {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			obj := EvaluteProgram(t, bytes.NewBufferString(test.i))
+			obj := EvaluateProgram(t, bytes.NewBufferString(test.i))
 			if obj.Inspect() != test.e {
 				t.Errorf("expected %q, got %q\n", test.e, obj.Inspect())
 			}
@@ -304,11 +334,103 @@ func TestEval(t *testing.T) {
 				Val: "hello",
 			},
 		},
+		{
+			`return "hello world"`,
+			object.StringObject{
+				Val: "hello world",
+			},
+		},
+		{
+			`return "hello"[0] + "ello"`,
+			object.StringObject{
+				Val: "hello",
+			},
+		},
+		{
+			`let a = "h"; a = a[0]; a`,
+			object.StringObject{
+				Val: "h",
+			},
+		},
+		{
+			`[1,2,"string", [1,2]]`,
+			object.ArrayObject{
+				Val: []object.Object{
+					object.IntegerObject{
+						Val: 1,
+					},
+					object.IntegerObject{
+						Val: 2,
+					},
+					object.StringObject{
+						Val: "string",
+					},
+					object.ArrayObject{
+						Val: []object.Object{
+							object.IntegerObject{
+								Val: 1,
+							},
+							object.IntegerObject{
+								Val: 2,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			`[1,2,3][0]`,
+			object.IntegerObject{
+				Val: 1,
+			},
+		},
+		{
+			`[1,2,"string"][2]`,
+			object.StringObject{
+				Val: "string",
+			},
+		},
+		{
+			`let a = { "a": "b"}`,
+			object.MapObject{
+				Val: map[object.Object]object.Object{
+					object.StringObject{
+						Val: "a",
+					}: object.StringObject{
+						Val: "b",
+					},
+				},
+			},
+		},
+		{
+			`let a = { "a": "b"}; a["a"]`,
+			object.StringObject{
+				Val: "b",
+			},
+		},
+		{
+			`let a = { true: false}; a[true]`,
+			object.BoolObject{
+				Val: false,
+			},
+		},
+		{
+			`len("")`,
+			object.IntegerObject{
+				Val: 0,
+			},
+		},
+		{
+			`len("hello")`,
+			object.IntegerObject{
+				Val: 5,
+			},
+		},
 	}
 
 	for i, test := range ts {
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
-			obj := EvaluteProgram(t, bytes.NewBufferString(test.i))
+			obj := EvaluateProgram(t, bytes.NewBufferString(test.i))
 			AssertObjects(t, obj, test.o)
 		})
 	}

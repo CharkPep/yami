@@ -53,32 +53,40 @@ func (l *Lexer) Read(t *Token) error {
 		l.assignToken(t, EQ, l.line, l.column, "==")
 		return nil
 	case ';':
-		l.assignToken(t, SCOLUMN, l.line, l.column, ";")
+		l.assignToken(t, SCOLON, l.line, l.column, ";")
 		return nil
 	case '+':
 		l.assignToken(t, PLUS, l.line, l.column, "+")
 		return nil
 	case '>':
-		ok := l.peekAndAssert(byte('='))
-		if !ok {
+		switch {
+		case l.peekAndAssert(byte('=')):
+			l.r.ReadByte()
+			l.column++
+			l.assignToken(t, GTE, l.line, l.column, ">=")
+		case l.peekAndAssert(byte('>')):
+			l.r.ReadByte()
+			l.column++
+			l.assignToken(t, BRSHIFT, l.line, l.column, ">>")
+		default:
 			l.assignToken(t, GT, l.line, l.column, ">")
-			return nil
 		}
 
-		l.r.ReadByte()
-		l.column++
-		l.assignToken(t, GTE, l.line, l.column, ">=")
 		return nil
 	case '<':
-		ok := l.peekAndAssert(byte('='))
-		if !ok {
+		switch {
+		case l.peekAndAssert(byte('=')):
+			l.r.ReadByte()
+			l.column++
+			l.assignToken(t, LTE, l.line, l.column, "<=")
+		case l.peekAndAssert(byte('<')):
+			l.r.ReadByte()
+			l.column++
+			l.assignToken(t, BLSHIFT, l.line, l.column, "<<")
+		default:
 			l.assignToken(t, LT, l.line, l.column, "<")
-			return nil
 		}
 
-		l.r.ReadByte()
-		l.column++
-		l.assignToken(t, LTE, l.line, l.column, "<=")
 		return nil
 	case '-':
 		l.assignToken(t, HYPHEN, l.line, l.column, "-")
@@ -163,6 +171,9 @@ func (l *Lexer) Read(t *Token) error {
 	case ',':
 		l.assignToken(t, COMA, l.line, l.column, ",")
 		return nil
+	case ':':
+		l.assignToken(t, COLON, l.line, l.column, ":")
+		return nil
 	default:
 		var literal []byte
 		if IsDigit(cur) {
@@ -181,7 +192,6 @@ func (l *Lexer) Read(t *Token) error {
 	}
 
 }
-
 func (l *Lexer) assignToken(t *Token, tType TokenType, line, column int, literal string) {
 	t.Token = tType
 	t.Line = line

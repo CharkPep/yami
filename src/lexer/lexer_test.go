@@ -23,7 +23,7 @@ func TestSingeToken(t *testing.T) {
 		{
 			i: ";",
 			out: Token{
-				Token:   SCOLUMN,
+				Token:   SCOLON,
 				Literal: ";",
 			},
 		},
@@ -71,7 +71,7 @@ func TestMultipleTokens(t *testing.T) {
 					Literal: "]",
 				},
 				{
-					Token:   SCOLUMN,
+					Token:   SCOLON,
 					Literal: ";",
 				},
 				{
@@ -119,7 +119,7 @@ let
 			},
 		},
 		{
-			i: "5*100!=501 || 1 == 1 && 1 == 1 < > <= >= if() {} else",
+			i: `5*100!=501 || 1 == 1 && 1 == 1 < > <= >= if() {} else [] [1,1,1] & | << >> { "a" : "b" }`,
 			out: []Token{
 				{
 					Token:   NUMBER,
@@ -214,6 +214,78 @@ let
 					Token:   ELSE,
 					Literal: "else",
 				},
+				{
+					Token:   SBLEFT,
+					Literal: "[",
+				},
+				{
+					Token:   SBRIGHT,
+					Literal: "]",
+				},
+				{
+					Token:   SBLEFT,
+					Literal: "[",
+				},
+				{
+					Token:   NUMBER,
+					Literal: "1",
+				},
+				{
+					Token:   COMA,
+					Literal: ",",
+				},
+				{
+					Token:   NUMBER,
+					Literal: "1",
+				},
+				{
+					Token:   COMA,
+					Literal: ",",
+				},
+				{
+					Token:   NUMBER,
+					Literal: "1",
+				},
+				{
+					Token:   SBRIGHT,
+					Literal: "]",
+				},
+				{
+					Token:   BAND,
+					Literal: "&",
+				},
+				{
+					Token:   BOR,
+					Literal: "|",
+				},
+				{
+					Token:   BLSHIFT,
+					Literal: "<<",
+				},
+				{
+					Token:   BRSHIFT,
+					Literal: ">>",
+				},
+				{
+					Token:   BRLEFT,
+					Literal: "{",
+				},
+				{
+					Token:   STRING,
+					Literal: "a",
+				},
+				{
+					Token:   COLON,
+					Literal: ":",
+				},
+				{
+					Token:   STRING,
+					Literal: "b",
+				},
+				{
+					Token:   BRRIGHT,
+					Literal: "}",
+				},
 			},
 		}}
 
@@ -269,7 +341,7 @@ func TestLexerLineAndColumnCount(t *testing.T) {
 					Literal: "10",
 				},
 				{
-					Token:   SCOLUMN,
+					Token:   SCOLON,
 					Line:    0,
 					Column:  11,
 					Literal: ";",
@@ -311,7 +383,7 @@ let abc_aaa ==  != 10;`,
 					Literal: "10",
 				},
 				{
-					Token:   SCOLUMN,
+					Token:   SCOLON,
 					Line:    1,
 					Column:  22,
 					Literal: ";",

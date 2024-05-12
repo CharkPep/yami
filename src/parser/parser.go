@@ -15,13 +15,14 @@ const (
 	OR // ==, !=, &&, ||
 	AND
 	RELATIONAL // < >, <= or >=, ==, !=
-	BIN_AND
-	XOR
 	BIN_OR
+	XOR
+	BIN_AND
 	BIN_SHIFT
 	ADDITION // +
 	MULTIPLICATION
 	PREFIX // -5 !5
+	IDX    // a[1]
 	CALL   // func()
 )
 
@@ -86,10 +87,16 @@ type Parser struct {
 }
 
 func (p *Parser) registerPrefixFunc(token lexer.TokenType, fn prefixParseFn) {
+	if _, ok := p.prefixParseFn[token]; ok {
+		panic(fmt.Sprintf("parser for %q, already exists", token))
+	}
 	p.prefixParseFn[token] = fn
 }
 
 func (p *Parser) registerInfixFunc(token lexer.TokenType, fn infixParseFn) {
+	if _, ok := p.infixParseFn[token]; ok {
+		panic(fmt.Sprintf("parser for %q, already exists", token))
+	}
 	p.infixParseFn[token] = fn
 }
 
@@ -115,12 +122,14 @@ func NewParserFromLexer(lex lexer.TokenReader) *Parser {
 	p.registerPrefixFunc(lexer.FUNC, p.ParseFuncExpression)
 	p.registerInfixFunc(lexer.BLEFT, p.parseCallExpression)
 	p.registerInfixFunc(lexer.ASSIGN, p.parseAssignExpression)
+	p.registerPrefixFunc(lexer.SBLEFT, p.parseArrayExpression)
 	p.registerPrefixFunc(lexer.TRUE, p.parseBoolExpression)
 	p.registerPrefixFunc(lexer.FALSE, p.parseBoolExpression)
-	p.registerPrefixFunc(lexer.STRING, p.parseString)
-
+	p.registerPrefixFunc(lexer.STRING, p.parseStringExpression)
+	p.registerPrefixFunc(lexer.BRLEFT, p.parseHashMap)
+	p.registerInfixFunc(lexer.SBLEFT, p.parseIndexExpression)
 	p.registerInfixesFunc(p.ParseInfix, lexer.PLUS, lexer.HYPHEN, lexer.SLASH, lexer.ASTERISK, lexer.EQ, lexer.NEQ,
-		lexer.OR, lexer.AND, lexer.GT, lexer.GTE, lexer.LT, lexer.LTE)
+		lexer.OR, lexer.AND, lexer.GT, lexer.GTE, lexer.LT, lexer.LTE, lexer.BOR, lexer.BAND, lexer.BLSHIFT, lexer.BRSHIFT)
 
 	return p
 }
@@ -170,7 +179,7 @@ func (p *Parser) parseStatement() (Statement, error) {
 		st, err = p.parseReturnStatement()
 	case lexer.BRLEFT:
 		st, err = p.parseBlockStatement()
-	case lexer.SCOLUMN:
+	case lexer.SCOLON:
 		break
 	default:
 		st, err = p.parserExpressionStatement()
@@ -184,7 +193,7 @@ func (p *Parser) parseStatement() (Statement, error) {
 		p.Errors = append(p.Errors, err.(ParsingError))
 	}
 
-	if p.peekToken.Token == lexer.SCOLUMN {
+	if p.peekToken.Token == lexer.SCOLON {
 		if err = p.read(); err != nil {
 			return nil, err
 		}
@@ -216,7 +225,7 @@ func (p *Parser) parseExpression(precedence int) (Expression, error) {
 		return nil, err
 	}
 
-	for !p.isCurToken(lexer.SCOLUMN) && precedence < p.precedence(p.peekToken.Token) {
+	for !p.isCurToken(lexer.SCOLON) && precedence < p.precedence(p.peekToken.Token) {
 		p.read()
 		infix, ok := p.infixParseFn[p.curToken.Token]
 		if !ok {
@@ -242,12 +251,20 @@ func (p *Parser) precedence(token lexer.TokenType) int {
 		return AND
 	case lexer.LT, lexer.LTE, lexer.GTE, lexer.GT, lexer.EQ, lexer.NEQ:
 		return RELATIONAL
+	case lexer.BAND:
+		return BIN_AND
+	case lexer.BOR:
+		return BIN_OR
+	case lexer.BLSHIFT, lexer.BRSHIFT:
+		return BIN_SHIFT
 	case lexer.PLUS, lexer.HYPHEN:
 		return ADDITION
 	case lexer.SLASH, lexer.ASTERISK:
 		return MULTIPLICATION
 	case lexer.BANG:
 		return PREFIX
+	case lexer.SBLEFT:
+		return IDX
 	case lexer.BLEFT:
 		return CALL
 	}

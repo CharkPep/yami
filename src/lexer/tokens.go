@@ -23,11 +23,13 @@ const (
 	FALSE  = "FALSE"
 	RETURN = "RETURN"
 
-	PLUS    = "PLUS"
-	HYPHEN  = "HYPHEN"
-	SLASH   = "SLASH"
-	SCOLUMN = "SCOLUMN" // Semi column
-	ASSIGN  = "ASSIGN"
+	PLUS   = "PLUS"
+	HYPHEN = "HYPHEN"
+	SLASH  = "SLASH"
+
+	SCOLON = "SCOLON" // Semi colon
+	COLON  = "COLON"
+	ASSIGN = "ASSIGN"
 
 	// Boolean
 
@@ -43,8 +45,9 @@ const (
 
 	// Bitwise operation
 
-	BAND    = "BAND"
-	BOR     = "BOR"
+	BAND = "BAND"
+	BOR  = "BOR"
+	// TODO: implement the rest of bitwise operators
 	BXOR    = "BXOR"
 	BLSHIFT = "BLSHIFT"
 	BRSHIFT = "BRSHIFT"
@@ -55,8 +58,8 @@ const (
 	BRIGHT   = "BRIGHT"  // [B]rackets right
 	SBLEFT   = "SBLEFT"  // [S]quare [B]rackets left
 	SBRIGHT  = "SBRIGHT" // [S]quare [B]rackets right
-	BRLEFT   = "BRLEFT"  // [Br]aces left
-	BRRIGHT  = "BRRIGHT" // [Br]aces left
+	BRLEFT   = "BRLEFT"  // Curly [Br]aces left
+	BRRIGHT  = "BRRIGHT" // Curly [Br]aces left
 	ASTERISK = "ASTERISK"
 
 	COMA    = "COMA"

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/charkpep/yad/src/parser"
+	"io"
+	"os"
 	"strings"
 )
 
@@ -14,6 +16,19 @@ var (
 	BOOL_OBJ    ObjectType = "BOOL"
 	STRING_OBJ  ObjectType = "STRING"
 	NIL_OBJ     ObjectType = "NIL"
+	ARRAY_OBJ   ObjectType = "ARRAY"
+	MAP_OBJ     ObjectType = "MAP"
+	BUILDIN_OBJ ObjectType = "BUILDIN"
+)
+
+var (
+	TRUE = BoolObject{
+		Val: true,
+	}
+	FALSE = BoolObject{
+		Val: false,
+	}
+	NIL = NilObject{}
 )
 
 type IntegerObject struct {
@@ -103,4 +118,81 @@ func (str StringObject) Type() ObjectType {
 
 func (str StringObject) Inspect() string {
 	return str.Val
+}
+
+type ArrayObject struct {
+	Val []Object
+}
+
+func (arr ArrayObject) Type() ObjectType {
+	return ARRAY_OBJ
+}
+
+func (arr ArrayObject) Inspect() string {
+	var buff bytes.Buffer
+	buff.WriteString("[")
+	objects := make([]string, 0, len(arr.Val))
+	for _, arg := range arr.Val {
+		objects = append(objects, arg.Inspect())
+	}
+	buff.WriteString(strings.Join(objects, ","))
+	buff.WriteString("]")
+	return buff.String()
+}
+
+type MapObject struct {
+	Val map[Object]Object
+}
+
+func (mp MapObject) Type() ObjectType {
+	return MAP_OBJ
+}
+
+func (mp MapObject) Inspect() string {
+	var buff bytes.Buffer
+	buff.WriteString("{")
+	var elements []string
+	for k, v := range mp.Val {
+		elements = append(elements, fmt.Sprintf("%s:%s", k.Inspect(), v.Inspect()))
+	}
+
+	buff.WriteString(strings.Join(elements, ","))
+	buff.WriteString("}")
+	return buff.String()
+}
+
+// BuildInFunc nodes like len, print
+type BuildInFunc func(args ...Object) (Object, error)
+
+func (b BuildInFunc) Inspect() string {
+	return "build in"
+}
+
+func (b BuildInFunc) Type() ObjectType {
+	return BUILDIN_OBJ
+}
+
+var BuildIns = map[string]BuildInFunc{
+	"len": func(args ...Object) (Object, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("expected 1 argument, got %d", len(args))
+		}
+
+		switch v := args[0].(type) {
+		case StringObject:
+			return IntegerObject{Val: int64(len(v.Val))}, nil
+		case ArrayObject:
+			return IntegerObject{Val: int64(len(v.Val))}, nil
+		default:
+			return nil, fmt.Errorf("unexpected argument type")
+		}
+	},
+	"print": func(args ...Object) (Object, error) {
+		for _, arg := range args {
+			io.WriteString(os.Stdout, arg.Inspect())
+			io.WriteString(os.Stdout, "\n")
+		}
+
+		return NIL, nil
+	},
 }

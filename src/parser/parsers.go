@@ -313,9 +313,105 @@ func (p *Parser) parseReturnStatement() (Statement, error) {
 	return rt, err
 }
 
-func (p *Parser) parseString() (Expression, error) {
+func (p *Parser) parseStringExpression() (Expression, error) {
 	return StringExpression{
 		tok: p.curToken,
 		Val: p.curToken.Literal,
 	}, nil
+}
+
+func (p *Parser) parseIndexExpression(expr Expression) (Expression, error) {
+	idx := IndexExpression{
+		token: p.curToken,
+		Of:    expr,
+	}
+	p.read()
+	var err error
+	idx.Idx, err = p.parseExpression(LOWEST)
+	if err != nil {
+		return nil, err
+	}
+
+	p.read()
+
+	return idx, err
+}
+
+func (p *Parser) parseArrayExpression() (Expression, error) {
+	arr := ArrayExpression{
+		token: p.curToken,
+	}
+
+	p.read()
+	if p.curToken.Token != lexer.SBRIGHT {
+		var err error
+		arr.Arr, err = p.parseComaSeparatedExpressions()
+		if err != nil {
+			return nil, err
+		}
+		p.read()
+	}
+
+	return arr, nil
+}
+
+func (p *Parser) parseHashMap() (Expression, error) {
+	mp := HashMapExpression{
+		token: p.curToken,
+	}
+
+	p.read()
+	if p.curToken.Token != lexer.BRRIGHT {
+		var err error
+		mp.Map, err = p.parseComaSeparatedPairs()
+		if err != nil {
+			return nil, err
+		}
+		p.read()
+	}
+
+	return mp, nil
+}
+
+func (p *Parser) parseComaSeparatedPairs() (map[Expression]Expression, error) {
+	expressions := make(map[Expression]Expression)
+	key, val, err := p.parserPair()
+	if err != nil {
+		return nil, err
+	}
+
+	expressions[key] = val
+	for p.peekToken.Token == lexer.COMA {
+		p.read()
+		p.read()
+		key, val, err = p.parserPair()
+		if err != nil {
+			return nil, err
+		}
+
+		expressions[key] = val
+	}
+
+	return expressions, nil
+}
+
+func (p *Parser) parserPair() (Expression, Expression, error) {
+	key, err := p.parseExpression(LOWEST)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if p.peekToken.Token != lexer.COLON {
+		return nil, nil, NewParsingError("expected proceeding column", p.curToken)
+	}
+
+	p.read()
+	p.read()
+
+	val, err := p.parseExpression(LOWEST)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return key, val, err
 }
