@@ -3,7 +3,8 @@ let fib = fn () {
     let n = 0
     let fib_r = fn (cur, prev, cur_n) {
         cache[cur_n] = cur
-        if cur_n == n { return cur
+        if cur_n == n { 
+            return cur
         }
 
         return fib_r(cur + prev, cur, cur_n + 1)

@@ -286,3 +286,17 @@ func (mp HashMapExpression) expression() {}
 func (mp HashMapExpression) Token() lexer.Token {
 	return mp.token
 }
+
+type NilExpression struct {
+	token lexer.Token
+}
+
+func (n NilExpression) Token() lexer.Token {
+	return n.token
+}
+
+func (n NilExpression) expression() {}
+
+func (n NilExpression) String() string {
+	return "nil"
+}

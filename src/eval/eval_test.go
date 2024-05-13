@@ -484,6 +484,16 @@ func TestEval(t *testing.T) {
 				Val: "atr",
 			},
 		},
+		{
+			`if (1 == 1) { return }`,
+			object.NIL,
+		},
+		{
+			`"day " + 1`,
+			object.StringObject{
+				Val: "day 1",
+			},
+		},
 	}
 
 	for i, test := range ts {

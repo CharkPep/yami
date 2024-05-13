@@ -61,6 +61,8 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 
 		env.Set(v.Identifier.Token().Literal, val)
 		return val, nil
+	case parser.NilExpression:
+		return object.NIL, nil
 	case parser.IntegerExpression:
 		return object.IntegerObject{
 			Val: v.Val,
@@ -385,7 +387,14 @@ func (e Evaluator) evalInfix(infix *parser.InfixExpression, env *object.Environm
 		return object.StringObject{
 			Val: left.(object.StringObject).Val + right.(object.StringObject).Val,
 		}, nil
-
+	case right.Type() == object.STRING_OBJ && left.Type() == object.INTEGER_OBJ:
+		return object.StringObject{
+			Val: fmt.Sprint(left.(object.IntegerObject).Val) + right.(object.StringObject).Val,
+		}, nil
+	case right.Type() == object.INTEGER_OBJ && left.Type() == object.STRING_OBJ:
+		return object.StringObject{
+			Val: left.(object.StringObject).Val + fmt.Sprint(right.(object.IntegerObject).Val),
+		}, nil
 	}
 
 	return nil, NewRuntimeError("not supported types", infix)

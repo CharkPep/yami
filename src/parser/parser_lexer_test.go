@@ -176,6 +176,8 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 		if len(v.Map) != len(b.(HashMapExpression).Map) {
 			t.Errorf("failed to assert map lengthes\n")
 		}
+	case NilExpression:
+		return true
 	case IndexExpression:
 		if !AssertNodes(t, v.Idx, b.(IndexExpression).Idx) {
 			return false
@@ -1139,6 +1141,27 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			`{ return }`,
+			&RootNode{
+				Statements: []Statement{
+					BlockStatement{
+						Statements: []Statement{
+							ReturnStatement{
+								token: lexer.Token{
+									Token:   lexer.RETURN,
+									Literal: "return",
+								},
+								ReturnExpr: NilExpression{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			``
 		},
 	}
 

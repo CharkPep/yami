@@ -304,17 +304,20 @@ func (p *Parser) parseBoolExpression() (Expression, error) {
 
 func (p *Parser) parseReturnStatement() (Statement, error) {
 	rt := ReturnStatement{
-		token: p.curToken,
+		token:      p.curToken,
+		ReturnExpr: NilExpression{token: p.curToken},
 	}
 
-	p.read()
-	var err error
-	rt.ReturnExpr, err = p.parseExpression(LOWEST)
-	if err != nil {
-		return nil, err
+	if p.peekToken.Token != lexer.BRRIGHT {
+		var err error
+		p.read()
+		rt.ReturnExpr, err = p.parseExpression(LOWEST)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return rt, err
+	return rt, nil
 }
 
 func (p *Parser) parseStringExpression() (Expression, error) {
