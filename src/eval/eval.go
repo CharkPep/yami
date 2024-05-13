@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/charkpep/yad/src/object"
 	"github.com/charkpep/yad/src/parser"
+	"strings"
 )
 
 type RuntimeError struct {
@@ -90,12 +91,27 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 			switch {
 			case structure.Type() == object.MAP_OBJ:
 				structure.(object.MapObject).Val[idx] = val
-			case structure.Type() == object.ARRAY_OBJ && val.Type() == object.INTEGER_OBJ:
+			case structure.Type() == object.ARRAY_OBJ && idx.Type() == object.INTEGER_OBJ:
 				if idx.(object.IntegerObject).Val >= int64(len(structure.(*object.ArrayObject).Val)) {
 					return nil, NewRuntimeError("index out of bounds", ident)
 				}
-
 				structure.(*object.ArrayObject).Val[idx.(object.IntegerObject).Val] = val
+			case structure.Type() == object.STRING_OBJ && idx.Type() == object.INTEGER_OBJ:
+				index := idx.(object.IntegerObject).Val
+				obj := structure.(object.StringObject)
+				str := strings.Split(structure.(object.StringObject).Val, "")
+				value := val.(object.StringObject).Val
+				if len(value) > 1 {
+					return nil, NewRuntimeError("assignment by index to the string must contains only one character", ident)
+				}
+
+				if index >= int64(len(strings.Split(value, ""))) {
+					return nil, NewRuntimeError("index out of bounds", ident)
+				}
+
+				str[idx.(object.IntegerObject).Val] = val.(object.StringObject).Val
+				obj.Val = strings.Join(str, "")
+				env.Set(ident.Identifier.Literal, obj)
 			default:
 				return nil, NewRuntimeError("unsupported assignment", node)
 			}

@@ -473,9 +473,15 @@ func TestEval(t *testing.T) {
 			},
 		},
 		{
-			`let a = [1]; a[0] = 0; a[0]`,
+			`let a = [1]; a[0] = 10; a[0]`,
 			object.IntegerObject{
-				Val: 0,
+				Val: 10,
+			},
+		},
+		{
+			`let s = "str"; s[0] = "a"; s`,
+			object.StringObject{
+				Val: "atr",
 			},
 		},
 	}
