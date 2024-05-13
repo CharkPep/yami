@@ -41,6 +41,7 @@ func (e Evaluator) EvalWithEnv(node parser.Node, env *object.Environment) (objec
 	return e.eval(node, env)
 }
 
+// TODO decouple in separate functions shit pile of switch case
 func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Object, error) {
 	switch v := node.(type) {
 	case *parser.RootNode:
@@ -64,17 +65,50 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 			Val: v.Val,
 		}, nil
 	case parser.AssignExpression:
-		if _, ok := env.Get(v.Identifier.Token().Literal); !ok {
-			return nil, NewRuntimeError("identifier is not defined", v)
-		}
+		switch identifierExpression := v.Identifier.(type) {
+		case parser.IndexExpression:
+			ident, ok := identifierExpression.Of.(parser.IdentifierExpression)
+			if !ok {
+				return nil, NewRuntimeError("expected identifier for indexed assignment", identifierExpression)
+			}
 
-		val, err := e.eval(v.Val, env)
-		if err != nil {
-			return nil, err
-		}
+			structure, ok := env.Get(ident.Identifier.Literal)
+			if !ok {
+				return nil, NewRuntimeError("identifier is not defined", identifierExpression)
+			}
 
-		env.Set(v.Identifier.Token().Literal, val)
-		return val, nil
+			idx, err := e.eval(identifierExpression.Idx, env)
+			if err != nil {
+				return nil, err
+			}
+
+			val, err := e.eval(v.Val, env)
+			if err != nil {
+				return nil, err
+			}
+
+			switch {
+			case structure.Type() == object.MAP_OBJ:
+				structure.(object.MapObject).Val[idx] = val
+				//case structure.Type() ==  object.ARRAY_OBJ && val.Type() == object.INTEGER_OBJ:
+				//	if val.(object.IntegerObject).Val >= int64(len(structure.(*object.ArrayObject).Val)) {
+				//		return nil, NewRuntimeError("index out of bounds", ident)
+				//	}
+
+			}
+
+			return val, nil
+		case parser.IdentifierExpression:
+			val, err := e.eval(v.Val, env)
+			if err != nil {
+				return nil, err
+			}
+
+			env.Set(identifierExpression.Token().Literal, val)
+			return val, nil
+		default:
+			return nil, NewRuntimeError("unsupported assignment", node)
+		}
 	case parser.IfExpression:
 		condition, err := e.eval(v.Condition, env)
 		if err != nil {
@@ -96,7 +130,7 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 
 		return object.NIL, nil
 	case parser.FuncExpression:
-		return object.NewFuncObject(v.Args, v.Body), nil
+		return object.NewFuncObject(v.Args, v.Body, object.DeriveEnv(env)), nil
 	case parser.BlockStatement:
 		derivedEvn := object.DeriveEnv(env)
 		return e.evalBlockStatement(v, derivedEvn)
@@ -167,7 +201,7 @@ func (e Evaluator) evalMap(mp parser.HashMapExpression, env *object.Environment)
 }
 
 func (e Evaluator) evalArray(arrExpr parser.ArrayExpression, env *object.Environment) (object.Object, error) {
-	arr := object.ArrayObject{
+	arr := &object.ArrayObject{
 		Val: make([]object.Object, 0, len(arrExpr.Arr)),
 	}
 
@@ -204,9 +238,13 @@ func (e Evaluator) evalIndex(expr parser.IndexExpression, env *object.Environmen
 			Val: string(str[index]),
 		}, nil
 	case idx.Type() == object.INTEGER_OBJ && ofObj.Type() == object.ARRAY_OBJ:
-		return ofObj.(object.ArrayObject).Val[idx.(object.IntegerObject).Val], nil
+		return ofObj.(*object.ArrayObject).Val[idx.(object.IntegerObject).Val], nil
 	case ofObj.Type() == object.MAP_OBJ:
-		return ofObj.(object.MapObject).Val[idx], nil
+		val, ok := ofObj.(object.MapObject).Val[idx]
+		if !ok {
+			val = object.NIL
+		}
+		return val, nil
 	default:
 		return nil, NewRuntimeError("unexpected index type for expression", expr)
 	}
@@ -214,7 +252,7 @@ func (e Evaluator) evalIndex(expr parser.IndexExpression, env *object.Environmen
 }
 
 func (e Evaluator) evalBlockStatement(stmt parser.BlockStatement, env *object.Environment) (object.Object, error) {
-	var res object.Object
+	var res object.Object = object.NIL
 	for _, stmt := range stmt.Statements {
 		var err error
 		res, err = e.eval(stmt, env)
@@ -225,7 +263,6 @@ func (e Evaluator) evalBlockStatement(stmt parser.BlockStatement, env *object.En
 		if res.Type() == object.RETURN_OBJ {
 			return res, nil
 		}
-
 	}
 
 	return res, nil
@@ -244,16 +281,16 @@ func (e Evaluator) evalCallExpression(expr parser.CallExpression, env *object.En
 			return nil, NewRuntimeError("mismatching number of arguments", expr)
 		}
 
-		derivedEvn := object.DeriveEnv(env)
 		objs, err := e.evalExpressions(expr.CallArgs, env)
 		if err != nil {
 			return nil, err
 		}
 
 		for i, k := range call.Args {
-			derivedEvn.Set(k.Identifier.Literal, objs[i])
+			call.Env.Set(k.Identifier.Literal, objs[i])
 		}
-		return e.evalStatements(call.Body.Statements, derivedEvn)
+
+		return e.evalStatements(call.Body.Statements, call.Env)
 	case object.BuildInFunc:
 		objs, err := e.evalExpressions(expr.CallArgs, env)
 		if err != nil {
@@ -282,8 +319,7 @@ func (e Evaluator) evalExpressions(args []parser.Expression, env *object.Environ
 }
 
 func (e Evaluator) evalStatements(stmts []parser.Statement, env *object.Environment) (object.Object, error) {
-	var res object.Object
-
+	var res object.Object = object.NIL
 	for _, stmt := range stmts {
 		var err error
 		res, err = e.eval(stmt, env)
@@ -291,10 +327,9 @@ func (e Evaluator) evalStatements(stmts []parser.Statement, env *object.Environm
 			return nil, err
 		}
 
-		if res.Type() == object.RETURN_OBJ {
+		if res.Type() != object.NIL_OBJ && res.Type() == object.RETURN_OBJ {
 			return res.(object.ReturnObject).Val, nil
 		}
-
 	}
 
 	return res, nil
@@ -447,6 +482,8 @@ func (e Evaluator) evalMinusPrefix(obj object.Object) (object.Object, error) {
 
 func (e Evaluator) evalObjToBool(obj object.Object) (object.BoolObject, error) {
 	switch v := obj.(type) {
+	case object.NilObject:
+		return object.FALSE, nil
 	case object.BoolObject:
 		return v, nil
 	case object.IntegerObject:

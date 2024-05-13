@@ -176,7 +176,14 @@ func AssertNodes(t *testing.T, a, b Node) bool {
 		if len(v.Map) != len(b.(HashMapExpression).Map) {
 			t.Errorf("failed to assert map lengthes\n")
 		}
+	case IndexExpression:
+		if !AssertNodes(t, v.Idx, b.(IndexExpression).Idx) {
+			return false
+		}
 
+		if !AssertNodes(t, v.Of, b.(IndexExpression).Of) {
+			return false
+		}
 	default:
 		t.Errorf("Not supported type %T\n", v)
 		return false
@@ -1102,6 +1109,31 @@ func TestAstTreeWithConcreteLexer(t *testing.T) {
 								ArrayExpression{
 									Arr: []Expression{},
 								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			`a["a"] = "b"`,
+			&RootNode{
+				Statements: []Statement{
+					ExpressionStatement{
+						Expr: AssignExpression{
+							Identifier: IndexExpression{
+								Of: IdentifierExpression{
+									Identifier: lexer.Token{
+										Token:   lexer.IDENT,
+										Literal: "a",
+									},
+								},
+								Idx: StringExpression{
+									Val: "a",
+								},
+							},
+							Val: StringExpression{
+								Val: "b",
 							},
 						},
 					},

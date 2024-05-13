@@ -1,6 +1,6 @@
 # Yami - Yet another monkey interpreter
 Interpreter for **monkey language** described in [Interpreter in Go](https://interpreterbook.com) by Thorsten Ball. 
-As monkey language has no specification some features were added.
+Some features were added as monkey does not have essential features like cycles, any assignments, imports etc.  
 ## Example
 
 ```monkey
@@ -14,7 +14,7 @@ let fib = fn (cur, prev, cur_n) {
     return fib(cur + prev, cur, cur_n + 1)
 }
   
-fib(0, 1, 0)  
+print(fib(0, 1, 0))
 ```
 
 

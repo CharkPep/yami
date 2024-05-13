@@ -74,15 +74,15 @@ func AssertObjects(t *testing.T, a, b object.Object) bool {
 			t.Errorf("failed to assert string values")
 			return false
 		}
-	case object.ArrayObject:
-		bArr := b.(object.ArrayObject)
+	case *object.ArrayObject:
+		bArr := b.(*object.ArrayObject)
 		if len(v.Val) != len(bArr.Val) {
 			t.Errorf("failed to assert array lengthes")
 			return false
 		}
 
 		for i := range v.Val {
-			if !AssertObjects(t, v.Val[i], b.(object.ArrayObject).Val[i]) {
+			if !AssertObjects(t, v.Val[i], b.(*object.ArrayObject).Val[i]) {
 				return false
 			}
 		}
@@ -354,7 +354,7 @@ func TestEval(t *testing.T) {
 		},
 		{
 			`[1,2,"string", [1,2]]`,
-			object.ArrayObject{
+			&object.ArrayObject{
 				Val: []object.Object{
 					object.IntegerObject{
 						Val: 1,
@@ -365,7 +365,7 @@ func TestEval(t *testing.T) {
 					object.StringObject{
 						Val: "string",
 					},
-					object.ArrayObject{
+					&object.ArrayObject{
 						Val: []object.Object{
 							object.IntegerObject{
 								Val: 1,
@@ -426,9 +426,56 @@ func TestEval(t *testing.T) {
 				Val: 5,
 			},
 		},
+		{
+			`let a = {}; if a[1] { "bad" } else { "pass" }`,
+			object.StringObject{
+				Val: "pass",
+			},
+		},
+		{
+			`let count = fn() { let counter = 0; return fn() { counter = counter + 1; return counter } } let c = count(); c()`,
+			object.IntegerObject{
+				Val: 1,
+			},
+		},
+		{
+			`let n = 10; let set = fn(n) { n }; set(1)`,
+			object.IntegerObject{Val: 1},
+		},
+		{
+			`{}`,
+			object.NIL,
+		},
+		{
+			`let a = fn() {
+				let n = 10
+				let b = fn() {
+					n = n + 1
+				}
+				b()
+				return n
+			}
+			a()`,
+			object.IntegerObject{
+				Val: 11,
+			},
+		},
+		{
+			`let a = [[1]]; a[0][0]`,
+			object.IntegerObject{
+				Val: 1,
+			},
+		},
+		{
+			`let a = {}; a["a"] = "b"; a["a"]`,
+			object.StringObject{
+				Val: "b",
+			},
+		},
 	}
 
 	for i, test := range ts {
+		t.Log(test.i)
 		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
 			obj := EvaluateProgram(t, bytes.NewBufferString(test.i))
 			AssertObjects(t, obj, test.o)

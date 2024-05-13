@@ -249,7 +249,7 @@ go.work
 # Recommended: Go.AllowList.gitignore
 
 # Ignore everything
-*
+#*
 
 # But not these files...
 !/.gitignore

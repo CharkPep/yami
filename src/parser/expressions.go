@@ -174,7 +174,7 @@ func (c CallExpression) String() string {
 
 type AssignExpression struct {
 	token      lexer.Token
-	Identifier IdentifierExpression
+	Identifier Expression
 	Val        Expression
 }
 

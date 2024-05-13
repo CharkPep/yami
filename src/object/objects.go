@@ -80,6 +80,7 @@ func (r ReturnObject) Inspect() string {
 type FuncObject struct {
 	Args []parser.IdentifierExpression
 	Body parser.BlockStatement
+	Env  *Environment
 }
 
 func (f FuncObject) Type() ObjectType {
@@ -101,10 +102,11 @@ func (f FuncObject) Inspect() string {
 	return buff.String()
 }
 
-func NewFuncObject(args []parser.IdentifierExpression, body parser.BlockStatement) FuncObject {
+func NewFuncObject(args []parser.IdentifierExpression, body parser.BlockStatement, env *Environment) FuncObject {
 	return FuncObject{
 		Args: args,
 		Body: body,
+		Env:  env,
 	}
 }
 
@@ -124,11 +126,11 @@ type ArrayObject struct {
 	Val []Object
 }
 
-func (arr ArrayObject) Type() ObjectType {
+func (arr *ArrayObject) Type() ObjectType {
 	return ARRAY_OBJ
 }
 
-func (arr ArrayObject) Inspect() string {
+func (arr *ArrayObject) Inspect() string {
 	var buff bytes.Buffer
 	buff.WriteString("[")
 	objects := make([]string, 0, len(arr.Val))
@@ -181,7 +183,7 @@ var BuildIns = map[string]BuildInFunc{
 		switch v := args[0].(type) {
 		case StringObject:
 			return IntegerObject{Val: int64(len(v.Val))}, nil
-		case ArrayObject:
+		case *ArrayObject:
 			return IntegerObject{Val: int64(len(v.Val))}, nil
 		default:
 			return nil, fmt.Errorf("unexpected argument type")

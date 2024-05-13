@@ -96,7 +96,8 @@ func (p *Parser) parseLet() (Statement, error) {
 
 func (p *Parser) parseBlockStatement() (Statement, error) {
 	block := BlockStatement{
-		token: p.curToken,
+		token:      p.curToken,
+		Statements: make([]Statement, 0),
 	}
 
 	p.read()
@@ -267,13 +268,16 @@ func (p *Parser) parseCallExpression(fn Expression) (Expression, error) {
 }
 
 func (p *Parser) parseAssignExpression(ex Expression) (Expression, error) {
-	if _, ok := ex.(IdentifierExpression); !ok {
+	switch ex.(type) {
+	case IdentifierExpression:
+	case IndexExpression:
+	default:
 		return nil, NewParsingError(fmt.Sprintf("expected Identifier, got %T\n", ex), p.curToken)
 	}
 
 	assign := AssignExpression{
 		token:      p.curToken,
-		Identifier: ex.(IdentifierExpression),
+		Identifier: ex,
 	}
 
 	p.read()

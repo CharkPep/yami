@@ -19,6 +19,21 @@ func DeriveEnv(root *Environment) *Environment {
 }
 
 func (e Environment) Set(key string, val Object) {
+	if _, ok := e.env[key]; ok {
+		e.env[key] = val
+		return
+	}
+
+	var parentEnv = e.rootEnv
+	for parentEnv != nil {
+		if _, ok := parentEnv.env[key]; ok {
+			parentEnv.env[key] = val
+			return
+		}
+
+		parentEnv = parentEnv.rootEnv
+	}
+
 	e.env[key] = val
 }
 
