@@ -90,11 +90,14 @@ func (e Evaluator) eval(node parser.Node, env *object.Environment) (object.Objec
 			switch {
 			case structure.Type() == object.MAP_OBJ:
 				structure.(object.MapObject).Val[idx] = val
-				//case structure.Type() ==  object.ARRAY_OBJ && val.Type() == object.INTEGER_OBJ:
-				//	if val.(object.IntegerObject).Val >= int64(len(structure.(*object.ArrayObject).Val)) {
-				//		return nil, NewRuntimeError("index out of bounds", ident)
-				//	}
+			case structure.Type() == object.ARRAY_OBJ && val.Type() == object.INTEGER_OBJ:
+				if idx.(object.IntegerObject).Val >= int64(len(structure.(*object.ArrayObject).Val)) {
+					return nil, NewRuntimeError("index out of bounds", ident)
+				}
 
+				structure.(*object.ArrayObject).Val[idx.(object.IntegerObject).Val] = val
+			default:
+				return nil, NewRuntimeError("unsupported assignment", node)
 			}
 
 			return val, nil
@@ -238,7 +241,12 @@ func (e Evaluator) evalIndex(expr parser.IndexExpression, env *object.Environmen
 			Val: string(str[index]),
 		}, nil
 	case idx.Type() == object.INTEGER_OBJ && ofObj.Type() == object.ARRAY_OBJ:
-		return ofObj.(*object.ArrayObject).Val[idx.(object.IntegerObject).Val], nil
+		index := idx.(object.IntegerObject).Val
+		arr := ofObj.(*object.ArrayObject).Val
+		if index >= int64(len(arr)) {
+			return nil, NewRuntimeError("index out of bounds", expr)
+		}
+		return arr[index], nil
 	case ofObj.Type() == object.MAP_OBJ:
 		val, ok := ofObj.(object.MapObject).Val[idx]
 		if !ok {

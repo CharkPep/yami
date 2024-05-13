@@ -472,6 +472,12 @@ func TestEval(t *testing.T) {
 				Val: "b",
 			},
 		},
+		{
+			`let a = [1]; a[0] = 0; a[0]`,
+			object.IntegerObject{
+				Val: 0,
+			},
+		},
 	}
 
 	for i, test := range ts {
