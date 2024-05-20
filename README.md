@@ -1,4 +1,5 @@
 # Yami - Yet another monkey interpreter
+
 Interpreter for **monkey language** described in [Interpreter in Go](https://interpreterbook.com) by Thorsten Ball. 
 Some features were added as monkey does not have essential features like assignments etc.
 
@@ -32,6 +33,13 @@ let fib = fn (cur, prev, cur_n) {
 }
   
 print(fib(0, 1, 0))
+
+// expressions
+
+let x = if !5 { print("hello world") }
+
+print(x)
+
 ```
 
 Check [examples](/example/)

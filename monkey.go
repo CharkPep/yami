@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/charkpep/yad/src/eval"
-	"github.com/charkpep/yad/src/parser"
-	"github.com/charkpep/yad/src/repl"
+	"github.com/charkpep/yami/src/eval"
+	"github.com/charkpep/yami/src/parser"
+	"github.com/charkpep/yami/src/repl"
 	"io"
 	"os"
 	"path/filepath"

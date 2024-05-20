@@ -3,9 +3,9 @@ package eval
 import (
 	"bytes"
 	"fmt"
-	"github.com/charkpep/yad/src/lexer"
-	"github.com/charkpep/yad/src/object"
-	"github.com/charkpep/yad/src/parser"
+	"github.com/charkpep/yami/src/lexer"
+	"github.com/charkpep/yami/src/object"
+	"github.com/charkpep/yami/src/parser"
 	"io"
 	"reflect"
 	"testing"

@@ -2,8 +2,8 @@ package eval
 
 import (
 	"fmt"
-	"github.com/charkpep/yad/src/object"
-	"github.com/charkpep/yad/src/parser"
+	"github.com/charkpep/yami/src/object"
+	"github.com/charkpep/yami/src/parser"
 	"strings"
 )
 

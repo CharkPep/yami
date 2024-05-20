@@ -1,6 +1,6 @@
 package utils
 
-import "github.com/charkpep/yad/src/lexer"
+import "github.com/charkpep/yami/src/lexer"
 
 type LexerMock struct {
 	tokens    []lexer.Token

@@ -3,7 +3,7 @@ package object
 import (
 	"bytes"
 	"fmt"
-	"github.com/charkpep/yad/src/parser"
+	"github.com/charkpep/yami/src/parser"
 	"io"
 	"os"
 	"strings"

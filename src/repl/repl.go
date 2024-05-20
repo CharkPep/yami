@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/charkpep/yad/src/eval"
-	"github.com/charkpep/yad/src/object"
-	"github.com/charkpep/yad/src/parser"
+	"github.com/charkpep/yami/src/eval"
+	"github.com/charkpep/yami/src/object"
+	"github.com/charkpep/yami/src/parser"
 	"io"
 )
 

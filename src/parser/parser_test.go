@@ -3,8 +3,8 @@ package parser
 import (
 	"bytes"
 	"fmt"
-	"github.com/charkpep/yad/src/lexer"
-	"github.com/charkpep/yad/src/utils"
+	"github.com/charkpep/yami/src/lexer"
+	"github.com/charkpep/yami/src/utils"
 	"regexp"
 	"testing"
 )

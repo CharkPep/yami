@@ -2,7 +2,7 @@ package parser
 
 import (
 	"fmt"
-	"github.com/charkpep/yad/src/lexer"
+	"github.com/charkpep/yami/src/lexer"
 	"strconv"
 )
 
